@@ -17,8 +17,10 @@ from voltaire_bundler.utils.encode import encode_handleops_calldata
 from voltaire_bundler.utils.eth_client_utils import \
     send_rpc_request_to_eth_client
 
+from ..data_manager import DataManager
 from ..gas_manager import GasManager
 from ..reputation_manager import ReputationManager
+from ..simulation_manager import SimulationManager
 from ..validation_manager import ValidationManager
 
 
@@ -28,7 +30,9 @@ class BundlerManager:
     bundler_address: str
     entrypoints_addresses_to_local_mempools: dict[Address, LocalMempoolManager]
     user_operation_handler: UserOperationHandler
+    data_manager: DataManager
     reputation_manager: ReputationManager
+    simulation_manager: SimulationManager
     chain_id: int
     is_legacy_mode: bool
     is_send_raw_transaction_conditional: bool
@@ -43,7 +47,9 @@ class BundlerManager:
         entrypoints_addresses_to_local_mempools: dict[Address, LocalMempoolManager],
         user_operation_handler: UserOperationHandler,
         reputation_manager: ReputationManager,
+        simulation_manager: SimulationManager,
         gas_manager: GasManager,
+        data_manager: DataManager,
         ethereum_node_url: str,
         bundler_private_key: str,
         bundler_address: str,
@@ -58,6 +64,8 @@ class BundlerManager:
         )
         self.user_operation_handler = user_operation_handler
         self.reputation_manager = reputation_manager
+        self.simulation_manager = simulation_manager
+        self.data_manager = data_manager
         self.gas_manager = gas_manager
         self.ethereum_node_url = ethereum_node_url
         self.bundler_private_key = bundler_private_key
@@ -77,7 +85,8 @@ class BundlerManager:
     async def send_next_bundle(self) -> None:
         for entrypoint, send_queue in self.entrypoints_addresses_to_send_queue.items():
             user_operations = send_queue
-            numbder_of_user_operations = len(send_queue)
+            user_operations = await self.data_manager.inject_data_operations(user_operations, entrypoint)
+            numbder_of_user_operations = len(user_operations)
 
             if numbder_of_user_operations > 0:
                 logging.info(
@@ -100,6 +109,14 @@ class BundlerManager:
     async def send_bundle(
         self, user_operations: list[UserOperation], entrypoint: str
     ) -> list[UserOperation]:
+
+        nonce, block_max_fee_per_gas, block_max_priority_fee_per_gas = await self._get_nonce_and_gas_prices()
+
+        user_operations = await self.simulation_manager.discard_unpaid_data_dependent_user_operations(
+            user_operations, entrypoint, self.data_manager.oracle_address, block_max_fee_per_gas
+        )
+        if len(user_operations) == 0:
+            return []
         user_operations_list = []
         gas_estimation = 0
         for user_operation in user_operations:
@@ -109,60 +126,10 @@ class BundlerManager:
                 + user_operation.verification_gas_limit * 3
             )
         gas_estimation += 10_000
-
+        
         call_data = encode_handleops_calldata(
             user_operations_list, self.bundler_address
         )
-
-        block_max_fee_per_gas_op = send_rpc_request_to_eth_client(
-            self.ethereum_node_url, "eth_gasPrice"
-        )
-
-        nonce_op = send_rpc_request_to_eth_client(
-            self.ethereum_node_url,
-            "eth_getTransactionCount",
-            [self.bundler_address, "latest"],
-        )
-
-        tasks_arr = [
-            block_max_fee_per_gas_op,
-            nonce_op,
-        ]
-
-        if not self.is_legacy_mode:
-            block_max_priority_fee_per_gas_op = send_rpc_request_to_eth_client(
-                self.ethereum_node_url, "eth_maxPriorityFeePerGas"
-            )
-            tasks_arr.append(block_max_priority_fee_per_gas_op)
-
-        try:
-            tasks = await asyncio.gather(*tasks_arr)
-        except ExecutionException:
-            return []
-
-        block_max_fee_per_gas = tasks[0]["result"]
-        nonce = tasks[1]["result"]
-
-        block_max_fee_per_gas_dec = int(block_max_fee_per_gas, 16)
-        block_max_fee_per_gas_dec_mod = math.ceil(
-            block_max_fee_per_gas_dec
-            * (self.max_fee_per_gas_percentage_multiplier / 100)
-            * (self.gas_price_percentage_multiplier / 100)
-        )
-        block_max_fee_per_gas = hex(block_max_fee_per_gas_dec_mod)
-
-        block_max_priority_fee_per_gas = 0
-        if not self.is_legacy_mode:
-            block_max_priority_fee_per_gas = tasks[2]["result"]
-            block_max_priority_fee_per_gas_dec = int(
-                    block_max_priority_fee_per_gas, 16)
-            block_max_priority_fee_per_gas_dec_mod = math.ceil(
-                block_max_priority_fee_per_gas_dec
-                * (self.max_priority_fee_per_gas_percentage_multiplier / 100)
-                * (self.gas_price_percentage_multiplier / 100)
-            )
-            block_max_priority_fee_per_gas = hex(
-                    block_max_priority_fee_per_gas_dec_mod)
 
         txnDict = {
             "chainId": self.chain_id,
@@ -232,7 +199,25 @@ class BundlerManager:
 
                 logging.info(
                         "Dropping user operation that caused bundle crash")
-                del user_operations[operation_index]
+                if user_operations[operation_index].is_data_user_op():
+                    logging.error("Data op validation reverts! Dropping it along with the user op")
+                    if (
+                        len(user_operations) > operation_index + 1
+                        and user_operations[operation_index + 1].user_operation_hash ==
+                            user_operations[operation_index].data_dependent_user_op_hash
+                    ):
+                        del user_operations[operation_index + 1]
+                    del user_operations[operation_index]
+                elif (
+                    user_operations[operation_index].is_data_dependent()
+                    and operation_index > 0
+                    and user_operations[operation_index].user_operation_hash ==
+                        user_operations[operation_index - 1].data_dependent_user_op_hash
+                ): 
+                    del user_operations[operation_index]
+                    del user_operations[operation_index - 1]
+                else:
+                    del user_operations[operation_index]
 
                 if len(user_operations) > 0:
                     await self.send_bundle(user_operations, entrypoint)
@@ -331,6 +316,58 @@ class BundlerManager:
                     user_operation.paymaster_address_lowercase,
                 )
             return []
+
+    async def _get_nonce_and_gas_prices(self) -> tuple[str, str, str]:
+        block_max_fee_per_gas_op = send_rpc_request_to_eth_client(
+            self.ethereum_node_url, "eth_gasPrice"
+        )
+
+        nonce_op = send_rpc_request_to_eth_client(
+            self.ethereum_node_url,
+            "eth_getTransactionCount",
+            [self.bundler_address, "latest"],
+        )
+
+        tasks_arr = [
+            block_max_fee_per_gas_op,
+            nonce_op,
+        ]
+
+        if not self.is_legacy_mode:
+            block_max_priority_fee_per_gas_op = send_rpc_request_to_eth_client(
+                self.ethereum_node_url, "eth_maxPriorityFeePerGas"
+            )
+            tasks_arr.append(block_max_priority_fee_per_gas_op)
+
+        try:
+            tasks = await asyncio.gather(*tasks_arr)
+        except ExecutionException:
+            return []
+
+        block_max_fee_per_gas = tasks[0]["result"]
+        nonce = tasks[1]["result"]
+
+        block_max_fee_per_gas_dec = int(block_max_fee_per_gas, 16)
+        block_max_fee_per_gas_dec_mod = math.ceil(
+            block_max_fee_per_gas_dec
+            * (self.max_fee_per_gas_percentage_multiplier / 100)
+            * (self.gas_price_percentage_multiplier / 100)
+        )
+        block_max_fee_per_gas = hex(block_max_fee_per_gas_dec_mod)
+
+        block_max_priority_fee_per_gas = 0
+        if not self.is_legacy_mode:
+            block_max_priority_fee_per_gas = tasks[2]["result"]
+            block_max_priority_fee_per_gas_dec = int(
+                    block_max_priority_fee_per_gas, 16)
+            block_max_priority_fee_per_gas_dec_mod = math.ceil(
+                block_max_priority_fee_per_gas_dec
+                * (self.max_priority_fee_per_gas_percentage_multiplier / 100)
+                * (self.gas_price_percentage_multiplier / 100)
+            )
+            block_max_priority_fee_per_gas = hex(
+                    block_max_priority_fee_per_gas_dec_mod)
+        return (nonce, block_max_fee_per_gas, block_max_priority_fee_per_gas)
 
     def update_included_status(
         self, sender_address: str,

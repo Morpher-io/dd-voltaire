@@ -7,11 +7,13 @@ from typing import Any, List
 from voltaire_bundler.bundler.exceptions import (ExecutionException,
                                                  ValidationException,
                                                  ValidationExceptionCode)
+from voltaire_bundler.bundler.data_manager import DataManager
 from voltaire_bundler.bundler.gas_manager import GasManager
 from voltaire_bundler.bundler.mempool.mempool_info import DEFAULT_MEMPOOL_INFO
 from voltaire_bundler.cli_manager import EntrypointType, MempoolType
 from voltaire_bundler.event_bus_manager.endpoint import Client, Endpoint
 from voltaire_bundler.typing import Address, MempoolId
+from voltaire_bundler.user_operation.models import DataRequirement
 from voltaire_bundler.user_operation.user_operation import (
     UserOperation, is_user_operation_hash)
 from voltaire_bundler.user_operation.user_operation_handler import \
@@ -22,6 +24,7 @@ from .bundle.bundle_manager import BundlerManager
 from .mempool.mempool_manager import (LocalMempoolManager,
                                       LocalMempoolManagerVersion0Point6)
 from .reputation_manager import ReputationManager, ReputationStatus
+from .simulation_manager import SimulationManager
 from .validation_manager import ValidationManager
 
 
@@ -34,6 +37,7 @@ class ExecutionEndpoint(Endpoint):
     user_operation_handler: UserOperationHandler
     reputation_manager: ReputationManager
     gas_manager: GasManager
+    data_manager: DataManager
     bundler_helper_byte_code: str
     chain_id: int
     is_unsafe: bool
@@ -59,8 +63,10 @@ class ExecutionEndpoint(Endpoint):
     def __init__(
         self,
         ethereum_node_url: str,
+        data_provider_url: str,
         bundler_private_key: str,
         bundler_address: Address,
+        bundler_smart_account_address: Address,
         entrypoints: list[Address],
         bundler_helper_byte_code: str,
         entrypoint_mod_byte_code: str,
@@ -80,6 +86,7 @@ class ExecutionEndpoint(Endpoint):
         disable_p2p: bool,
         max_verification_gas: int,
         max_call_data_gas: int,
+        oracle_address: str,
     ):
         super().__init__("bundler_endpoint")
         self.ethereum_node_url = ethereum_node_url
@@ -119,6 +126,23 @@ class ExecutionEndpoint(Endpoint):
             bundler_private_key,
             bundler_address,
             is_legacy_mode,
+        )
+
+        self.data_manager = DataManager(
+            ethereum_node_url,
+            data_provider_url,
+            self.gas_manager,
+            bundler_private_key,
+            bundler_address,
+            bundler_smart_account_address,
+            oracle_address,
+            chain_id
+        )
+
+        simulation_manager = SimulationManager(
+            ethereum_node_url,
+            bundler_address,
+            ethereum_node_debug_trace_call_url
         )
 
         self.validation_manager = ValidationManager(
@@ -202,7 +226,9 @@ class ExecutionEndpoint(Endpoint):
             self.entrypoints_to_local_mempools,
             self.user_operation_handler,
             self.reputation_manager,
+            simulation_manager,
             self.gas_manager,
+            self.data_manager,
             ethereum_node_url,
             bundler_private_key,
             bundler_address,
@@ -345,6 +371,44 @@ class ExecutionEndpoint(Endpoint):
 
         return estimated_gas_json
 
+    # params: [UserOp, EntrypointAddress, DataRequirements, StateOverride]
+    async def _event_rpc_estimateDataDependentUserOperationGas(
+            self, req_arguments: list) -> dict[str, str]:
+
+        state_override_set_dict: dict[str, Any] = {}
+
+        if req_arguments[3] is not None:
+            state_override_set_dict: dict[str, Any] = req_arguments[3]
+
+        if state_override_set_dict is not None and not isinstance(
+            state_override_set_dict, dict
+        ):
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalide state override set",
+            )
+
+        if self.data_manager.oracle_address in state_override_set_dict.keys():
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Cannot override oracle entrypoint state"
+            )
+
+        data_requirements: list[DataRequirement] = []
+        for req in req_arguments[2]:
+            data_requirements.append(DataRequirement(req["dataKey"].lower(), req["provider"].lower(), req["requester"].lower()))
+
+        state_override_set_dict = await self.data_manager.extend_state_overrides(
+            state_override_set_dict,
+            data_requirements
+        )
+
+        return await self._event_rpc_estimateUserOperationGas([
+            req_arguments[0],
+            req_arguments[1],
+            state_override_set_dict
+        ])
+
     async def _event_rpc_sendUserOperation(self, req_arguments: list) -> str:
         user_operation: UserOperation = UserOperation(req_arguments[0])
         entrypoint_address = req_arguments[1]
@@ -367,6 +431,29 @@ class ExecutionEndpoint(Endpoint):
                 verified_at_block_hash,
                 valid_mempools,
             )
+
+        return user_operation_hash
+
+    # params: [UserOp, EntrypointAddress, DataRequirements]
+    async def _event_rpc_sendDataDependentUserOperation(self, req_arguments: list) -> str:
+        data_requirements: list[DataRequirement] = []
+        for req in req_arguments[2]:
+            data_requirements.append(DataRequirement(req["dataKey"].lower(), req["provider"].lower(), req["requester"].lower()))
+
+        user_operation: UserOperation = UserOperation(req_arguments[0], requirements=data_requirements)
+        entrypoint_address = req_arguments[1]
+        if entrypoint_address not in self.entrypoints_to_local_mempools:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Unsupported entrypoint",
+            )
+
+        (user_operation_hash, _, __) = (
+            await self.entrypoints_to_local_mempools[
+                entrypoint_address
+            ].add_user_operation(user_operation)
+        )
+        # Do not brodcast, only bundler has the data!
 
         return user_operation_hash
 

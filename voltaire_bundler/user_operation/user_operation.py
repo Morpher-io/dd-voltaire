@@ -1,6 +1,8 @@
 import re
 from dataclasses import InitVar, dataclass
 
+from voltaire_bundler.user_operation.models import DataRequirement
+
 from voltaire_bundler.bundler.exceptions import (ValidationException,
                                                  ValidationExceptionCode)
 from voltaire_bundler.typing import Address, MempoolId
@@ -26,8 +28,17 @@ class UserOperation:
     valid_mempools_ids: list[MempoolId]
     user_operation_hash: str
     jsonRequestDict: InitVar[dict[str, Address | int | bytes]]
+    data_requirements: list[DataRequirement]
+    data_dependent_user_op_hash: str | None
+    data_cost: int
 
-    def __init__(self, jsonRequestDict) -> None:
+    def __init__(
+            self,
+            jsonRequestDict,
+            requirements: list[DataRequirement]=[],
+            linked_op=None,
+            costs=0
+        ) -> None:
         if len(jsonRequestDict) != 11:
             raise ValidationException(
                 ValidationExceptionCode.InvalidFields,
@@ -64,6 +75,12 @@ class UserOperation:
         self.valid_mempools_ids = []
 
         self.user_operation_hash = ""
+
+        self.data_requirements = requirements
+
+        self.data_dependent_user_op_hash = linked_op
+
+        self.data_cost = costs
 
         self._set_factory_and_paymaster_address()
 
@@ -149,6 +166,12 @@ class UserOperation:
                 "0x" + self.paymaster_and_data[:20].hex())
         else:
             self.paymaster_address_lowercase = None
+
+    def is_data_dependent(self):
+        return len(self.data_requirements) > 0
+
+    def is_data_user_op(self):
+        return self.data_dependent_user_op_hash is not None
 
 
 def verify_and_get_address(value: Address) -> Address:

@@ -50,8 +50,10 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
     async with asyncio.TaskGroup() as task_group:
         execution_endpoint: ExecutionEndpoint = ExecutionEndpoint(
             init_data.ethereum_node_url,
+            'http://' + init_data.data_host + ':' + str(init_data.data_port),
             init_data.bundler_pk,
             init_data.bundler_address,
+            init_data.bundler_smart_account_address,
             init_data.entrypoints,
             init_data.bundler_helper_byte_code,
             init_data.entrypoint_mod_byte_code,
@@ -71,6 +73,7 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
             init_data.disable_p2p,
             init_data.max_verification_gas,
             init_data.max_call_data_gas,
+            init_data.oracle_address,
         )
         task_group.create_task(execution_endpoint.start_execution_endpoint())
 

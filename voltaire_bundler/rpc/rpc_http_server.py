@@ -1,7 +1,7 @@
 import logging
 from functools import partial
 from importlib.metadata import version
-from typing import Any
+from typing import Any, List
 
 import aiohttp_cors
 from aiohttp import web
@@ -11,6 +11,8 @@ from prometheus_client import Summary
 from voltaire_bundler.bundler.exceptions import (ExecutionException,
                                                  ValidationException)
 from voltaire_bundler.event_bus_manager.endpoint import Client, RequestEvent
+
+# TODO(mic) add new rpc to show supported data keys
 
 REQUEST_TIME_eth_chainId = Summary(
     "request_processing_seconds_eth_chainId",
@@ -24,9 +26,17 @@ REQUEST_TIME_eth_estimateUserOperationGas = Summary(
     "request_processing_seconds_eth_estimateUserOperationGas",
     "Time spent processing request eth_estimateUserOperationGas",
 )
+REQUEST_TIME_eth_estimateDataDependentUserOperationGas = Summary(
+    "request_processing_seconds_eth_estimateUserDataDependentOperationGas",
+    "Time spent processing request eth_estimateDataDependentUserOperationGas",
+)
 REQUEST_TIME_chainId_eth_sendUserOperation = Summary(
     "request_processing_seconds_eth_sendUserOperation",
     "Time spent processing request eth_sendUserOperation",
+)
+REQUEST_TIME_chainId_eth_sendDataDependentUserOperation = Summary(
+    "request_processing_seconds_eth_sendDataDependentUserOperation",
+    "Time spent processing request eth_sendDataDependentUserOperation",
 )
 REQUEST_TIME_chainId_eth_getUserOperationReceipt = Summary(
     "request_processing_seconds_eth_getUserOperationReceipt",
@@ -97,6 +107,22 @@ async def eth_estimateUserOperationGas(
     return result
 
 
+@REQUEST_TIME_eth_estimateDataDependentUserOperationGas.time()
+@method
+async def eth_estimateDataDependentUserOperationGas(
+    userOperationJson: dict[str, Any],
+    entrypoint: str,
+    requirements: List[dict[str, Any]],
+    state_override_set: dict[str, Any] | None = None,
+) -> Result:
+    result = await _handle_rpc_request(
+        endpoint_id="bundler_endpoint",
+        request_type="rpc_estimateDataDependentUserOperationGas",
+        request_arguments=[userOperationJson, entrypoint, requirements, state_override_set],
+    )
+    return result
+
+
 @REQUEST_TIME_chainId_eth_sendUserOperation.time()
 @method
 async def eth_sendUserOperation(
@@ -106,6 +132,19 @@ async def eth_sendUserOperation(
         endpoint_id="bundler_endpoint",
         request_type="rpc_sendUserOperation",
         request_arguments=[userOperationJson, entrypoint],
+    )
+    return result
+
+
+@REQUEST_TIME_chainId_eth_sendDataDependentUserOperation.time()
+@method
+async def eth_sendDataDependentUserOperation(
+    userOperationJson: dict[str, Any], entrypoint: str, requirements: List[dict[str, Any]]
+) -> Result:
+    result = await _handle_rpc_request(
+        endpoint_id="bundler_endpoint",
+        request_type="rpc_sendDataDependentUserOperation",
+        request_arguments=[userOperationJson, entrypoint, requirements],
     )
     return result
 
@@ -194,7 +233,9 @@ async def handle(is_debug: bool, request: web.Request) -> web.Response:
         "eth_chainId": eth_chainId,
         "eth_supportedEntryPoints": eth_supportedEntryPoints,
         "eth_estimateUserOperationGas": eth_estimateUserOperationGas,
+        "eth_estimateDataDependentUserOperationGas": eth_estimateDataDependentUserOperationGas,
         "eth_sendUserOperation": eth_sendUserOperation,
+        "eth_sendDataDependentUserOperation": eth_sendDataDependentUserOperation,
         "eth_getUserOperationReceipt": eth_getUserOperationReceipt,
         "eth_getUserOperationByHash": eth_getUserOperationByHash,
         "web3_bundlerVersion": web3_bundlerVersion,

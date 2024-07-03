@@ -46,9 +46,12 @@ class InitData:
     entrypoints_versions: list[EntrypointType]
     rpc_url: str
     rpc_port: int
+    data_host: str
+    data_port: int
     ethereum_node_url: str
     bundler_pk: str
     bundler_address: Address
+    bundler_smart_account_address: Address
     bundler_helper_byte_code: str
     entrypoint_mod_byte_code: str
     chain_id: int
@@ -77,6 +80,7 @@ class InitData:
     disable_p2p: bool
     max_verification_gas: int
     max_call_data_gas: int
+    oracle_address: str
 
 
 def address(ep: str):
@@ -116,6 +120,13 @@ def initialize_argument_parser() -> ArgumentParser:
     )
 
     parser.add_argument(
+        "--oracle",
+        type=str,
+        help="Oracle contract address",
+        nargs="?"
+    )
+
+    parser.add_argument(
         "--entrypoints_versions",
         type=EntrypointType,
         nargs="+",
@@ -137,6 +148,13 @@ def initialize_argument_parser() -> ArgumentParser:
         type=str,
         help="Bundler Keystore file path - defaults to first file in keystore folder",
         nargs="?",
+    )
+
+    parser.add_argument(
+        "--bundler_smart_wallet",
+        type=str,
+        help="Bundler smart account address",
+        nargs="?"
     )
 
     parser.add_argument(
@@ -173,6 +191,24 @@ def initialize_argument_parser() -> ArgumentParser:
         nargs="?",
         const=3000,
         default=3000,
+    )
+
+    parser.add_argument(
+        "--data_host",
+        type=url_no_port,
+        help="Data provider host - defaults to localhost",
+        nargs="?",
+        const="127.0.0.1",
+        default="127.0.0.1",
+    )
+
+    parser.add_argument(
+        "--data_port",
+        type=unsigned_int,
+        help="Data provider port - defaults to 5000",
+        nargs="?",
+        const=5000,
+        default=5000,
     )
 
     parser.add_argument(
@@ -558,14 +594,25 @@ async def get_init_data(args: Namespace) -> InitData:
 
     init_entrypoint_and_mempool_data(args)
 
+    if args.bundler_smart_wallet is None:
+        logging.error("Cannot run the data bundler without a smart account onwed by the bundler!")
+        sys.exit(1)
+
+    if args.oracle is None:
+        logging.error("Please specify the oracle contract address!")
+        sys.exit(1)
+
     ret = InitData(
         args.entrypoints,
         args.entrypoints_versions,
         args.rpc_url,
         args.rpc_port,
+        args.data_host,
+        args.data_port,
         args.ethereum_node_url,
         bundler_pk,
         bundler_address,
+        args.bundler_smart_wallet,
         bundler_helper_byte_code,
         entrypoint_mod_byte_code,
         args.chain_id,
@@ -594,6 +641,7 @@ async def get_init_data(args: Namespace) -> InitData:
         args.disable_p2p,
         args.max_verification_gas,
         args.max_call_data_gas,
+        args.oracle,
     )
 
     if args.verbose:

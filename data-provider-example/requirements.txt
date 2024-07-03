@@ -1,0 +1,4 @@
+flask
+flask-socketio
+websocket-client
+eth_utils

@@ -77,3 +77,10 @@ class UserOperationReceiptInfo:
     actualGasUsed: int
     logs: Log
     receipt: ReceiptInfo
+
+
+@dataclass
+class DataRequirement:
+    dataKey: str
+    provider: str
+    requester: str
