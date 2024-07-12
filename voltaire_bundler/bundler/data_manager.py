@@ -293,7 +293,8 @@ class DataManager:
         key = encode(["bytes32"], [bytes.fromhex(requirement.dataKey[2:])])
         storage_slot = "0x" + keccak(key + keccak(requester + keccak(provider + slot_position))).hex()
         value = await self._provide_latest_data_value_for_key(requirement.dataKey)
-        s_o_dict[self.oracle_address]["stateDiff"][storage_slot] = value
+        # some clients don't like uint256 with leading 0s for some reason?
+        s_o_dict[self.oracle_address]["stateDiff"][hex(int(storage_slot, 16))] = hex(int(value, 16))
         return s_o_dict
 
     async def _build_meta_transactions(self, requirements: List[DataRequirement]) -> List[Any]:
