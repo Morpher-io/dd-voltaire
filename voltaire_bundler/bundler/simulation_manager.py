@@ -92,7 +92,12 @@ class SimulationManager:
 
         res: Any = await send_rpc_request_to_eth_client(
             self.ethereum_node_debug_trace_call_url, "debug_traceCall", params
-        ) 
+        )
+        if "error" in res and res["error"] is not None:
+            if "message" in res["error"]:
+                raise Exception("Error during bundle simulation: " + res["error"]["message"])
+            else:
+                raise Exception("Error during bundle simulation!")
 
         paid_requirements = []
         user_ops_reverted = []

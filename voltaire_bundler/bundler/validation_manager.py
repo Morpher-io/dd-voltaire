@@ -218,7 +218,7 @@ class ValidationManager:
             self.ethereum_node_debug_trace_call_url, "debug_traceCall", params
         )
 
-        if "result" in res:
+        if "result" in res and res["result"] is not None:
             debug_data = res["result"]
             return debug_data
 
