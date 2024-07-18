@@ -2,3 +2,4 @@ flask
 flask-socketio
 websocket-client
 eth_utils
+eth-hash[pycryptodome]

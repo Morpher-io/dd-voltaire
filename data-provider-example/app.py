@@ -4,9 +4,13 @@ from eth_utils import keccak
 import threading
 import websocket
 import json
+import logging
 
 app = Flask(__name__)
 socketio = SocketIO(app)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 price_data = {}
 
@@ -18,19 +22,20 @@ def encode_6_1_25_price_standard(price, timestamp):
 
 def on_message(ws, message):
     global price_data
+    logger.debug(f"Received message: {message}")
     data = json.loads(message)
     data_key = keccak(('BINANCE:' + data['s']).encode('utf-8'))
     data_value = encode_6_1_25_price_standard(data['p'], data['T'])
     price_data[data_key] = data_value
 
 def on_error(ws, error):
-    print(f"Error: {error}")
+    logger.info(f"Error: {error}")
 
 def on_close(ws, close_status_code, close_msg):
-    print("WebSocket closed")
+    logger.info("WebSocket closed")
 
 def on_open(ws):
-    print("WebSocket connection opened")
+    logger.info("WebSocket connection opened")
 
 def start_ws():
     ws_url = "wss://stream.binance.com:9443/ws/ethusdt@trade"
@@ -61,4 +66,5 @@ if __name__ == '__main__':
     ws_thread = threading.Thread(target=start_ws)
     ws_thread.daemon = True
     ws_thread.start()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    # don't use this in production :)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
