@@ -5,6 +5,7 @@ import threading
 import websocket
 import json
 import logging
+import time
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -32,7 +33,9 @@ def on_error(ws, error):
     logger.info(f"Error: {error}")
 
 def on_close(ws, close_status_code, close_msg):
-    logger.info("WebSocket closed")
+    logger.info("WebSocket closed. Trying to open the connection again")
+    time.sleep(5)
+    start_ws()
 
 def on_open(ws):
     logger.info("WebSocket connection opened")
