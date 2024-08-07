@@ -24,11 +24,6 @@ RUN chown -R appuser:appgroup /app
 RUN mkdir -p /app/cache
 RUN chmod a+w /app/cache
 
-ENTRYPOINT [ "python", "-m", "voltaire_bundler" ]
-CMD [ "--entrypoints 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789", 
-    "--bundler_secret 0xd7f305cda31c0cb26f900afd16b3fcd697c3c1d00855767a8352d41987643e36",
-    "--bundler_smart_wallet 0x90f007bfaf925a39e63568d8fc4712c81676ff05" +
-    "--chain_id 11155111" +
-    "--ethereum_node_url http://3.68.113.82:8545" +
-    "--oracle 0x36bDD3f53826e4359E22edb9C6DD2E81Dd4dEf41" +
-    "--verbose" ]
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT [ "/app/entrypoint.sh" ]
