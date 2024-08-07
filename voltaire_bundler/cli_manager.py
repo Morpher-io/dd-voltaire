@@ -46,8 +46,7 @@ class InitData:
     entrypoints_versions: list[EntrypointType]
     rpc_url: str
     rpc_port: int
-    data_host: str
-    data_port: int
+    data_provider_url: str
     ethereum_node_url: str
     bundler_pk: str
     bundler_address: Address
@@ -194,21 +193,12 @@ def initialize_argument_parser() -> ArgumentParser:
     )
 
     parser.add_argument(
-        "--data_host",
-        type=url_no_port,
-        help="Data provider host - defaults to localhost",
+        "--data_provider_url",
+        type=str,
+        help="Data provider - defaults to http://0.0.0.0:5000",
         nargs="?",
-        const="127.0.0.1",
-        default="127.0.0.1",
-    )
-
-    parser.add_argument(
-        "--data_port",
-        type=unsigned_int,
-        help="Data provider port - defaults to 5000",
-        nargs="?",
-        const=5000,
-        default=5000,
+        const="http://0.0.0.0:5000",
+        default="http://0.0.0.0:5000",
     )
 
     parser.add_argument(
@@ -607,8 +597,7 @@ async def get_init_data(args: Namespace) -> InitData:
         args.entrypoints_versions,
         args.rpc_url,
         args.rpc_port,
-        args.data_host,
-        args.data_port,
+        args.data_provider_url,
         args.ethereum_node_url,
         bundler_pk,
         bundler_address,

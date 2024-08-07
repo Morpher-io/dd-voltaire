@@ -50,7 +50,7 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
     async with asyncio.TaskGroup() as task_group:
         execution_endpoint: ExecutionEndpoint = ExecutionEndpoint(
             init_data.ethereum_node_url,
-            'http://' + init_data.data_host + ':' + str(init_data.data_port),
+            init_data.data_provider_url,
             init_data.bundler_pk,
             init_data.bundler_address,
             init_data.bundler_smart_account_address,
