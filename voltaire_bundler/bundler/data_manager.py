@@ -53,32 +53,12 @@ class DataManager:
         self.chain_id = chain_id
 
     async def provide_latest_data_value_for_key(self, data_key: str) -> str:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                self.data_provider_url + '/fetch?key=' + data_key
-            ) as response:
-                resp = await response.read()
-                resp_json = json.loads(resp)
-                if "error" in resp_json.keys():
-                    raise DataProviderException(
-                        DataProviderExceptionCode.GENERIC_ERROR,
-                        "Data Provider returned error: " + resp_json["error"]
-                    )
-                return resp_json["data"]
+        value = await self._call_data_provider('/fetch?key=' + data_key)
+        return value
 
     async def provide_list_of_provider_keys(self) -> list:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                self.data_provider_url + '/keys'
-            ) as response:
-                resp = await response.read()
-                resp_json = json.loads(resp)
-                if "error" in resp_json.keys():
-                    raise DataProviderException(
-                        DataProviderExceptionCode.GENERIC_ERROR,
-                        "Data Provider returned error: " + resp_json["error"]
-                    )
-                return resp_json["data"]
+        keys = await self._call_data_provider('/keys')
+        return keys
 
     async def extend_state_overrides(
             self,
@@ -371,3 +351,28 @@ class DataManager:
         (v_raw, r, s) = signature.vrs
         v = 27 + v_raw
         return (v, r, s)
+
+    async def _call_data_provider(self, path: str) -> Any:
+        async with aiohttp.ClientSession() as session:
+            resp_json = { "error": None }
+            try:
+                response = await session.get(self.data_provider_url + path)
+                resp = await response.read()
+                response.release()
+                resp_json = json.loads(resp)
+            except aiohttp.ClientError as e:
+                raise DataProviderException(
+                    DataProviderExceptionCode.GENERIC_ERROR,
+                    "HTTP request to data provider failed: " + str(e)
+                )
+            except Exception as e:
+                raise DataProviderException(
+                    DataProviderExceptionCode.GENERIC_ERROR,
+                    "Unexpected error encountered while connecting to data provider: " + str(e)
+                )
+            if "error" in resp_json.keys():
+                raise DataProviderException(
+                    DataProviderExceptionCode.GENERIC_ERROR,
+                    "Data Provider returned error: " + resp_json["error"]
+                )
+            return resp_json["data"]

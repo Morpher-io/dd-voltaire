@@ -592,12 +592,21 @@ async def get_init_data(args: Namespace) -> InitData:
         logging.error("Please specify the oracle contract address!")
         sys.exit(1)
 
+    if args.data_provider_url is None:
+        logging.error("Please specify the data provider url!")
+        sys.exit(1)
+
+    data_provider_url = args.data_provider_url
+    if '//' not in data_provider_url:
+        logging.warn("Missing protocol in data provider url, falling back to http...")
+        data_provider_url = 'http://' + data_provider_url
+
     ret = InitData(
         args.entrypoints,
         args.entrypoints_versions,
         args.rpc_url,
         args.rpc_port,
-        args.data_provider_url,
+        data_provider_url,
         args.ethereum_node_url,
         bundler_pk,
         bundler_address,
