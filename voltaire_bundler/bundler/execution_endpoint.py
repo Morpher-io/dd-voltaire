@@ -6,6 +6,7 @@ from typing import Any, List
 
 from voltaire_bundler.bundler.exceptions import (ExecutionException,
                                                  ValidationException,
+                                                 DataProviderException,
                                                  ValidationExceptionCode)
 from voltaire_bundler.bundler.data_manager import DataManager
 from voltaire_bundler.bundler.gas_manager import GasManager
@@ -501,6 +502,23 @@ class ExecutionEndpoint(Endpoint):
 
         return user_operation_receipt_info_json
 
+    async def _event_rpc_oracleDataKeys(
+            self, _) -> list:
+
+        keys = await self.data_manager.provide_list_of_provider_keys()
+
+        return keys
+
+    async def _event_rpc_oracleDataPreview(
+            self, req_arguments: list) -> str:
+        data_key = str(req_arguments[0])
+
+        value = await self.data_manager.provide_latest_data_value_for_key(
+            data_key 
+        )
+
+        return value
+
     async def _event_debug_bundler_sendBundleNow(self, _) -> str:
         await self.bundle_manager.update_send_queue()
         await self.bundle_manager.send_next_bundle()
@@ -694,7 +712,7 @@ async def exception_handler_decorator(
         rpc_call_response = await response_function(rpc_call_request)
         return rpc_call_response
 
-    except (ExecutionException, ValidationException) as excp:
+    except (ExecutionException, ValidationException, DataProviderException) as excp:
         rpc_call_response = {"payload": excp, "is_error": True}
         return rpc_call_response
 

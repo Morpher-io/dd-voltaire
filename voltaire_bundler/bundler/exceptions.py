@@ -34,3 +34,14 @@ class ExecutionException(Exception):
 @dataclass
 class MethodNotFoundException(Exception):
     exception_code: ExecutionExceptionCode
+
+
+@dataclass
+class DataProviderExceptionCode(Enum):
+    GENERIC_ERROR = -32000
+
+
+@dataclass
+class DataProviderException(Exception):
+    exception_code: DataProviderExceptionCode
+    message: str

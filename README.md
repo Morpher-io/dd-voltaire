@@ -13,6 +13,13 @@
    </p>
 </div>
 
+# Data endpoints
+This mod extends the bundler to provide 4 new endpoints:
+- `eth_sendDataDependentUserOperation`: to send data-dependent user operation, with the *data requirements* as an additional param
+- `eth_estimateDataDependentUserOperationGas`: to estimate gas for data-dependent user operation, with the *data requirements* as an additional param
+- `eth_oracleDataKeys`: to list the available data provided by the oracle
+- `eth_oracleDataPreview`: to get a preview of the current data for a particular key, unsigned
+
 # Usage
 
 ### Install Poetry

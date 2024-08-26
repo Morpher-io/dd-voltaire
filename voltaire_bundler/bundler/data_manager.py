@@ -9,14 +9,13 @@ from eth_abi.packed import encode_packed
 from eth_keys import keys
 from eth_utils import keccak
 
+from voltaire_bundler.bundler.exceptions import DataProviderException, DataProviderExceptionCode
 from voltaire_bundler.bundler.gas_manager import GasManager
 from voltaire_bundler.user_operation.models import DataRequirement
 from voltaire_bundler.user_operation.user_operation import UserOperation
 from voltaire_bundler.user_operation.user_operation_handler import \
     UserOperationHandler
 from voltaire_bundler.utils.eth_client_utils import (send_rpc_request_to_eth_client)
-
-import time # TODO(mic) remove
 
 
 ORACLE_DATA_STORAGE_SLOT = 2
@@ -52,6 +51,34 @@ class DataManager:
         self.bundler_smart_account_address = bundler_smart_account_address
         self.oracle_address = oracle_address
         self.chain_id = chain_id
+
+    async def provide_latest_data_value_for_key(self, data_key: str) -> str:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                self.data_provider_url + '/fetch?key=' + data_key
+            ) as response:
+                resp = await response.read()
+                resp_json = json.loads(resp)
+                if "error" in resp_json.keys():
+                    raise DataProviderException(
+                        DataProviderExceptionCode.GENERIC_ERROR,
+                        "Data Provider returned error: " + resp_json["error"]
+                    )
+                return resp_json["data"]
+
+    async def provide_list_of_provider_keys(self) -> list:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                self.data_provider_url + '/keys'
+            ) as response:
+                resp = await response.read()
+                resp_json = json.loads(resp)
+                if "error" in resp_json.keys():
+                    raise DataProviderException(
+                        DataProviderExceptionCode.GENERIC_ERROR,
+                        "Data Provider returned error: " + resp_json["error"]
+                    )
+                return resp_json["data"]
 
     async def extend_state_overrides(
             self,
@@ -292,7 +319,7 @@ class DataManager:
         requester = encode(["address"], [requirement.requester])
         key = encode(["bytes32"], [bytes.fromhex(requirement.dataKey[2:])])
         storage_slot = "0x" + keccak(key + keccak(requester + keccak(provider + slot_position))).hex()
-        value = await self._provide_latest_data_value_for_key(requirement.dataKey)
+        value = await self.provide_latest_data_value_for_key(requirement.dataKey)
         # some clients don't like uint256 with leading 0s for some reason?
         s_o_dict[self.oracle_address]["stateDiff"][hex(int(storage_slot, 16))] = hex(int(value, 16))
         return s_o_dict
@@ -303,7 +330,7 @@ class DataManager:
             if requirement.provider != self.bundler_address.lower():
                 raise Exception("Cannot inject data for another provider!")
             nonce = await self._get_nonce_for_oracle()
-            valueHex = await self._provide_latest_data_value_for_key(requirement.dataKey)
+            valueHex = await self.provide_latest_data_value_for_key(requirement.dataKey)
             unsignedData = [
                 bytes.fromhex(requirement.provider[2:]),
                 bytes.fromhex(requirement.requester[2:]),
@@ -337,17 +364,6 @@ class DataManager:
             ["address", "address", "uint256", "bytes32", "bytes32", "bytes32", "bytes32", "uint8"],
             data + [r, s, v]
         ).hex()
-
-    async def _provide_latest_data_value_for_key(self, data_key: str) -> str:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                self.data_provider_url + '/fetch?key=' + data_key
-            ) as response:
-                resp = await response.read()
-                resp_json = json.loads(resp)
-                if "error" in resp_json.keys():
-                    raise Exception("Data Provider returned error:" + resp_json["error"])
-                return resp_json["data"]
 
     def _sign_hash(self, hash: bytes):
         pk = keys.PrivateKey(bytes.fromhex(self.bundler_private_key[2:]))

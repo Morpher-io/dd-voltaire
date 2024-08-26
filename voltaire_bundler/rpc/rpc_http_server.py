@@ -9,7 +9,8 @@ from jsonrpcserver import Error, Result, Success, async_dispatch, method
 from prometheus_client import Summary
 
 from voltaire_bundler.bundler.exceptions import (ExecutionException,
-                                                 ValidationException)
+                                                 ValidationException,
+                                                 DataProviderException)
 from voltaire_bundler.event_bus_manager.endpoint import Client, RequestEvent
 
 # TODO(mic) add new rpc to show supported data keys
@@ -27,7 +28,7 @@ REQUEST_TIME_eth_estimateUserOperationGas = Summary(
     "Time spent processing request eth_estimateUserOperationGas",
 )
 REQUEST_TIME_eth_estimateDataDependentUserOperationGas = Summary(
-    "request_processing_seconds_eth_estimateUserDataDependentOperationGas",
+    "request_processing_seconds_eth_estimateDataDependentUserOperationGas",
     "Time spent processing request eth_estimateDataDependentUserOperationGas",
 )
 REQUEST_TIME_chainId_eth_sendUserOperation = Summary(
@@ -46,6 +47,14 @@ REQUEST_TIME_chainId_eth_getUserOperationByHash = Summary(
     "request_processing_seconds_eth_getUserOperationByHash",
     "Time spent processing request eth_getUserOperationByHash",
 )
+REQUEST_TIME_chainId_eth_oracleDataKeys = Summary(
+    "request_processing_seconds_eth_oracleDataKeys",
+    "Time spent processing request eth_oracleDataKeys",
+)
+REQUEST_TIME_chainId_eth_oracleDataPreview = Summary(
+    "request_processing_seconds_eth_oracleDataPreview",
+    "Time spent processing request eth_oracleDataPreview",
+)
 
 
 rpcClient: Client = Client("bundler_endpoint")
@@ -63,7 +72,7 @@ async def _handle_rpc_request(
     logging.debug(f"{request_type} RPC served")
 
     if resp is not None and "is_error" in resp and resp["is_error"]:
-        error: ValidationException | ExecutionException = resp["payload"]
+        error: ValidationException | ExecutionException | DataProviderException = resp["payload"]
         error_code = error.exception_code.value
         error_message = str(error.message)
 
@@ -171,6 +180,27 @@ async def eth_getUserOperationByHash(userOperationHash: str) -> Result:
     return result
 
 
+@REQUEST_TIME_chainId_eth_oracleDataKeys.time()
+@method
+async def eth_oracleDataKeys() -> Result:
+    result = await _handle_rpc_request(
+        endpoint_id="bundler_endpoint",
+        request_type="rpc_oracleDataKeys",
+    )
+    return result
+
+
+@REQUEST_TIME_chainId_eth_oracleDataPreview.time()
+@method
+async def eth_oracleDataPreview(dataKey: str) -> Result:
+    result = await _handle_rpc_request(
+        endpoint_id="bundler_endpoint",
+        request_type="rpc_oracleDataPreview",
+        request_arguments=[dataKey],
+    )
+    return result
+
+
 @method
 async def debug_bundler_sendBundleNow() -> Result:
     result = await _handle_rpc_request(
@@ -238,6 +268,8 @@ async def handle(is_debug: bool, request: web.Request) -> web.Response:
         "eth_sendDataDependentUserOperation": eth_sendDataDependentUserOperation,
         "eth_getUserOperationReceipt": eth_getUserOperationReceipt,
         "eth_getUserOperationByHash": eth_getUserOperationByHash,
+        "eth_oracleDataKeys": eth_oracleDataKeys,
+        "eth_oracleDataPreview": eth_oracleDataPreview,
         "web3_bundlerVersion": web3_bundlerVersion,
     }
 

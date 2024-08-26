@@ -65,6 +65,15 @@ def get_price():
     else:
         return jsonify({ "error": "Symbol not found" })
 
+@app.route('/keys', methods=['GET'])
+def get_keys():
+    return jsonify({ "data": [
+                    {
+                        "key" : "0x" + keccak(('BINANCE:ETHUSDT').encode('utf-8')).hex().zfill(64),
+                        "description": "Binance ETH/USDT price"
+                    }
+                ]})
+
 if __name__ == '__main__':
     ws_thread = threading.Thread(target=start_ws)
     ws_thread.daemon = True
