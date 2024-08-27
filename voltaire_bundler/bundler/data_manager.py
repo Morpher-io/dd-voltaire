@@ -356,7 +356,7 @@ class DataManager:
         async with aiohttp.ClientSession() as session:
             resp_json = { "error": None }
             try:
-                logging.warn("TEST executing request to data provider")
+                logging.warn("TEST executing request to data provider " + self.data_provider_url + path)
                 response = await session.get(self.data_provider_url + path)
                 logging.warn("TEST request executed")
                 resp = await response.read()
