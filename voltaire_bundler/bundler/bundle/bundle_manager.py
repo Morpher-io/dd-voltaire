@@ -95,6 +95,8 @@ class BundlerManager:
                 self.entrypoints_addresses_to_send_queue[entrypoint] = (
                     await self.send_bundle(user_operations, entrypoint)
                 )
+            else:
+                self.entrypoints_addresses_to_send_queue[entrypoint] = []
 
     async def update_send_queue(self) -> None:
         for (

@@ -211,7 +211,14 @@ class ValidationManager:
                 "gasPrice": gas_price_hex,
             },
             block_number,
-            {"tracer": self.bundler_collector_tracer},
+            {
+                "tracer": self.bundler_collector_tracer,
+                "stateOverrides": {
+                    self.bundler_address: {
+                        "balance": "0x314dc6448d9338c15b0a00000000"
+                    }
+                }
+            },
         ]
 
         res: Any = await send_rpc_request_to_eth_client(
