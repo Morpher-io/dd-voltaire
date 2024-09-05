@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+import logging
 from typing import Any
 
 from aiohttp import ClientSession
@@ -23,8 +23,12 @@ async def send_rpc_request_to_eth_client(
             data=json.dumps(json_request),
             headers={"content-type": "application/json"},
         ) as response:
-            resp = await response.read()
-            return json.loads(resp)
+            try:
+                resp = await response.read()
+                return json.loads(resp)
+            except json.decoder.JSONDecodeError:
+                logging.critical("Invalide json response from eth client")
+                raise ValueError("Invalide json response from eth client")
 
 
 async def get_latest_block_info(
@@ -52,34 +56,3 @@ async def get_latest_block_info(
         latest_block_timestamp,
         latest_block_hash,
     )
-
-
-@dataclass
-class DebugEntityData:
-    access: dict[str, dict[str, list[str]]]
-    opcodes: dict[str, int]
-    contract_size: dict[str, int]
-
-
-@dataclass
-class DebugTraceCallData:
-    factory_data: DebugEntityData
-    account_data: DebugEntityData
-    paymaster_data: DebugEntityData
-    keccak: list[str]
-    logs: list
-    calls: list
-    debug: list
-
-
-@dataclass
-class Call:
-    _to: str = ""
-    _from: str = ""
-    _type: str = ""
-    _method: str = ""
-    _value: str = ""
-    _gas: str = ""
-    _data: str = ""
-    _gas_used: str = ""
-    _return_type: str = ""  # RETURN or REVERT

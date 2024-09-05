@@ -1,5 +1,4 @@
-# FROM python:3.11.4-alpine3.18
-FROM public.ecr.aws/docker/library/python:3.11.6-alpine3.18
+FROM public.ecr.aws/docker/library/python:3.12-alpine
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
     # Allow statements and log messages to immediately appear

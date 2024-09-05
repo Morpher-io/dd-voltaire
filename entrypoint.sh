@@ -2,7 +2,6 @@
 
 cmd="python -m voltaire_bundler \
   --rpc_url 0.0.0.0 \
-  --entrypoints $ENTRYPOINTS \
   --bundler_secret $BUNDLER_SECRET \
   --bundler_smart_wallet $BUNDLER_SMART_WALLET \
   --chain_id $CHAIN_ID \
