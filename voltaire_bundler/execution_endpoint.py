@@ -185,10 +185,8 @@ class ExecutionEndpoint(Endpoint):
 
             p2pClient: Client = Client("p2p_endpoint")
             while not os.path.exists("p2p_endpoint.ipc"):
-                logging.info('STRA DIO')
                 await asyncio.sleep(1)
 
-            logging.info('DI DIO')
             await self.send_pooled_user_op_hashes_to_all_peers()
 
             while True:

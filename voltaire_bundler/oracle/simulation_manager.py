@@ -39,9 +39,11 @@ class SimulationManager:
         oracle_address: str,
         gas_price_hex: str,
     ) -> list[UserOperation]:
-        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint:
+        if len(user_operations) == 0:
+            return []
+        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
             encode_handleops_calldata = self.encode_handleops_calldata_v6
-        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint: 
+        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
             encode_handleops_calldata = self.encode_handleops_calldata_v7
         else:
             raise ValidationException(
@@ -61,6 +63,11 @@ class SimulationManager:
             },
             'latest',
             {
+                "stateOverrides": {
+                    self.bundler_address: {
+                        "balance": "0x314dc6448d9338c15b0a00000000"
+                    }
+                },
                 "tracer": "{\n" +
                     "    data: [],\n" +
                     "    fault: function (log) {\n" +

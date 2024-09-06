@@ -131,10 +131,10 @@ class DataManager:
             "maxPriorityFeePerGas": maxPriorityFeePerGas,
             "signature": None
         }
-        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint:
+        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
             jsonDict["initCode"] = "0x"
             jsonDict["paymasterAndData"] = "0x"
-        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint:
+        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
             jsonDict["factory"] = None
             jsonDict["factoryData"] = None
             jsonDict["paymaster"] = None
@@ -241,12 +241,12 @@ class DataManager:
             "maxPriorityFeePerGas": "0x00",
             "signature": "0x" + "ff" * 77
         }
-        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint:
+        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
             jsonDict["initCode"] = "0x"
             jsonDict["paymasterAndData"] = "0x"
             user_op = UserOperationV6(jsonDict)
             return await self.gas_manager_v6.estimate_user_operation_gas(user_op, entrypoint, dict())
-        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint:
+        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
             jsonDict["factory"] = None
             jsonDict["factoryData"] = None
             jsonDict["paymaster"] = None
@@ -262,7 +262,7 @@ class DataManager:
             )
 
     def _sign_user_op_for_safe_wallet(self, user_op: Any, entrypoint: str):
-        if entrypoint.lower() == LocalMempoolManagerV7.entrypoint:
+        if entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
             raise ValidationException(
                 ValidationExceptionCode.InvalidFields,
                 "V7 entrypoint data injection is not yet supported",
