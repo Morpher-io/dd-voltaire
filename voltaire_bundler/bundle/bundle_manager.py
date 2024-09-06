@@ -86,6 +86,8 @@ class BundlerManager:
         await self.update_send_queue()
 
         user_operations_to_send_v7 = self.user_operations_to_send_v7
+        if (len(user_operations_to_send_v7) > 0):
+            logging.debug(f"Got {len(user_operations_to_send_v7)} V7 user operations to send...")
         user_operations_to_send_v7 = await self.data_manager.inject_data_operations(
             user_operations_to_send_v7, self.local_mempool_manager_v7.entrypoint)
         self.user_operations_to_send_v7 = []
@@ -98,6 +100,8 @@ class BundlerManager:
         if self.user_operations_to_send_v6 is not None:
             assert self.local_mempool_manager_v6 is not None
             user_operations_to_send_v6 = self.user_operations_to_send_v6
+            if (len(user_operations_to_send_v6) > 0):
+                logging.debug(f"Got {len(user_operations_to_send_v6)} V6 user operations to send...")
             user_operations_to_send_v6 = await self.data_manager.inject_data_operations(
                 user_operations_to_send_v6, self.local_mempool_manager_v6.entrypoint)
             self.user_operations_to_send_v6 = []

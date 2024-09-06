@@ -177,6 +177,7 @@ class ExecutionEndpoint(Endpoint):
 
     async def execute_cron_job(self, is_debug: bool, bundle_interval: int) -> None:
         if not self.disable_p2p:
+            logging.debug("Launching bundling cron with P2P...")
             heartbeat_counter = 0
             heartbeat_interval = 0.1  # decisecond
             deciseconds_per_bundle = math.floor(
@@ -203,6 +204,7 @@ class ExecutionEndpoint(Endpoint):
                 heartbeat_counter = heartbeat_counter + 1
                 await asyncio.sleep(heartbeat_interval)
         elif not is_debug:
+            logging.debug("Launching bundling cron without P2P...")
             while True:
                 try:
                     await self.bundle_manager.send_next_bundle()
