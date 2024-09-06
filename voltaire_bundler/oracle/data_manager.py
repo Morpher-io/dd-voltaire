@@ -17,8 +17,10 @@ from voltaire_bundler.mempool.v6.mempool_manager_v6 import LocalMempoolManagerV6
 from voltaire_bundler.mempool.v7.mempool_manager_v7 import LocalMempoolManagerV7
 from voltaire_bundler.user_operation.models import DataRequirement
 from voltaire_bundler.user_operation.user_operation import UserOperation
-from voltaire_bundler.user_operation.v6.user_operation_v6 import UserOperationV6
-from voltaire_bundler.user_operation.v7.user_operation_v7 import UserOperationV7
+from voltaire_bundler.user_operation.v6.user_operation_v6 import UserOperationV6, \
+    get_user_operation_hash as get_user_operation_hash_v6
+from voltaire_bundler.user_operation.v7.user_operation_v7 import UserOperationV7, \
+    get_user_operation_hash as get_user_operation_hash_v7
 from voltaire_bundler.user_operation.user_operation_handler import \
     UserOperationHandler
 from voltaire_bundler.utils.eth_client_utils import (send_rpc_request_to_eth_client)
@@ -134,6 +136,11 @@ class DataManager:
         if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
             jsonDict["initCode"] = "0x"
             jsonDict["paymasterAndData"] = "0x"
+            jsonDict["signature"] = self._sign_user_op_for_safe_wallet(jsonDict, entrypoint)
+            user_op = UserOperationV6(jsonDict, [], linked_op)
+            user_operation_hash = get_user_operation_hash_v6(
+                user_op.to_list(), entrypoint, self.chain_id
+            )
         elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
             jsonDict["factory"] = None
             jsonDict["factoryData"] = None
@@ -141,16 +148,16 @@ class DataManager:
             jsonDict["paymasterVerificationGasLimit"] = None
             jsonDict["paymasterPostOpGasLimit"] = None
             jsonDict["paymasterData"] = None
+            jsonDict["signature"] = self._sign_user_op_for_safe_wallet(jsonDict, entrypoint)
+            user_op = UserOperationV7(jsonDict, [], linked_op)
+            user_operation_hash = get_user_operation_hash_v7(
+                user_op.to_list(), entrypoint, self.chain_id
+            )
         else:
             raise ValidationException(
                 ValidationExceptionCode.InvalidFields,
                 "Unsupported entrypoint",
             )
-        jsonDict["signature"] = self._sign_user_op_for_safe_wallet(jsonDict, entrypoint)
-        user_op = UserOperation(jsonDict, [], linked_op)
-        user_operation_hash = UserOperationHandler.get_user_operation_hash(
-            user_op.to_list(), entrypoint, self.chain_id
-        )
         user_op.user_operation_hash = user_operation_hash
         return user_op
 
