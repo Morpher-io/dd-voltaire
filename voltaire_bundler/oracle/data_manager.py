@@ -27,7 +27,8 @@ from voltaire_bundler.utils.eth_client_utils import (send_rpc_request_to_eth_cli
 
 
 ORACLE_DATA_STORAGE_SLOT = 2
-SAFE_MODULE_ADDRESS = '0xa581c4A4DB7175302464fF3C06380BC3270b4037'
+SAFE_MODULE_ADDRESS_V6 = '0xa581c4A4DB7175302464fF3C06380BC3270b4037'
+SAFE_MODULE_ADDRESS_V7 = '0x75cf11467937ce3F2f357CE24ffc3DBF8fD5c226'
 
 
 class DataManager:
@@ -269,28 +270,41 @@ class DataManager:
             )
 
     def _sign_user_op_for_safe_wallet(self, user_op: Any, entrypoint: str):
-        if entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
+        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
+            hashed_domain = self._get_hashed_domain(SAFE_MODULE_ADDRESS_V6)
+        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
+            hashed_domain = self._get_hashed_domain(SAFE_MODULE_ADDRESS_V7)
+        else:
             raise ValidationException(
                 ValidationExceptionCode.InvalidFields,
-                "V7 entrypoint data injection is not yet supported",
+                "Invalid entrypoint address",
             )
-        hashed_domain = self._get_hashed_domain()
         hashed_payload = self._hash_payload(user_op, entrypoint)
         hash_to_sign = keccak(bytes.fromhex('1901') + hashed_domain + hashed_payload)
         (v, r, s) = self._sign_hash(hash_to_sign)
         signature = r.to_bytes(32, 'big') + s.to_bytes(32, 'big') + v.to_bytes(1, 'big')
         return "0x" + encode_packed(["uint48", "uint48", "bytes"], [0, 0, signature]).hex()
 
-    def _get_hashed_domain(self) -> bytes:
+    def _get_hashed_domain(self, safeModuleAddress) -> bytes:
         # hash of EIP712Domain(uint256 chainId,address verifyingContract)
         prefix = "47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218"
         chainId = hex(self.chain_id)[2:].zfill(64)
-        address = SAFE_MODULE_ADDRESS[2:].zfill(64)
+        address = safeModuleAddress[2:].zfill(64)
         return keccak(bytes.fromhex(prefix + chainId + address))
 
     def _hash_payload(self, user_op: dict[str, Any], entrypoint: str) -> bytes:
-        # hash of the payload types
-        prefix = "84aa190356f56b8c87825f54884392a9907c23ee0f8e1ea86336b763faf021bd"
+        if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
+            # hash of the payload types
+            prefix = "84aa190356f56b8c87825f54884392a9907c23ee0f8e1ea86336b763faf021bd"
+        elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
+            prefix = "c03dfc11d8b10bf9cf703d558958c8c42777f785d998c62060d85a4f0ef6ea7f"
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint address",
+            )
+        # with empty factory and paymaster data the resulting initCode and
+        # paymasterAndData are still 0x in v7 safe op
         return keccak(
             bytes.fromhex(prefix) +
             bytes.fromhex(user_op["sender"][2:].zfill(64)) +
