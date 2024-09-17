@@ -38,7 +38,8 @@ class DataManager:
     gas_manager_v7: GasManagerV7
     bundler_private_key: str
     bundler_address: str
-    bundler_smart_account_address: str
+    bundler_smart_account_address_v6: str
+    bundler_smart_account_address_v7: str
     oracle_address: str
     chain_id: int
 
@@ -50,7 +51,8 @@ class DataManager:
         gas_manager_v7: GasManagerV7,
         bundler_private_key: str,
         bundler_address: str,
-        bundler_smart_account_address: str,
+        bundler_smart_account_address_v6: str,
+        bundler_smart_account_address_v7: str,
         oracle_address: str,
         chain_id: int,
     ):
@@ -60,7 +62,8 @@ class DataManager:
         self.gas_manager_v7 = gas_manager_v7
         self.bundler_private_key = bundler_private_key
         self.bundler_address = bundler_address
-        self.bundler_smart_account_address = bundler_smart_account_address
+        self.bundler_smart_account_address_v6 = bundler_smart_account_address_v6
+        self.bundler_smart_account_address_v7 = bundler_smart_account_address_v7
         self.oracle_address = oracle_address
         self.chain_id = chain_id
 
@@ -124,7 +127,6 @@ class DataManager:
             nonce, calldata, entrypoint
         )
         jsonDict = {
-            "sender": self.bundler_smart_account_address,
             "nonce": hex(nonce),
             "callData": calldata,
             "callGasLimit":callGasLimit,
@@ -135,6 +137,7 @@ class DataManager:
             "signature": None
         }
         if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
+            jsonDict["sender"] = self.bundler_smart_account_address_v6
             jsonDict["initCode"] = "0x"
             jsonDict["paymasterAndData"] = "0x"
             jsonDict["signature"] = self._sign_user_op_for_safe_wallet(jsonDict, entrypoint)
@@ -143,6 +146,7 @@ class DataManager:
                 user_op.to_list(), entrypoint, self.chain_id
             )
         elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
+            jsonDict["sender"] = self.bundler_smart_account_address_v7
             jsonDict["factory"] = None
             jsonDict["factoryData"] = None
             jsonDict["paymaster"] = None
@@ -207,9 +211,18 @@ class DataManager:
 
     async def _get_bundler_nonce(self, entryPoint: str) -> int:
         getNonceSelector = "0x35567e1a"
+        if entryPoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
+            smart_account_address = self.bundler_smart_account_address_v6
+        elif entryPoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
+            smart_account_address = self.bundler_smart_account_address_v7
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Unsupported entrypoint",
+            )
         calldata = getNonceSelector + encode(
             ["address", "uint192"],
-            [bytes.fromhex(self.bundler_smart_account_address[2:]), 0],
+            [bytes.fromhex(smart_account_address[2:]), 0],
         ).hex()
         params = [
             {
@@ -239,7 +252,6 @@ class DataManager:
 
     async def _get_gas_limits(self, nonce: int, calldata: str, entrypoint: str) -> tuple[str, str, str]:
         jsonDict = {
-            "sender": self.bundler_smart_account_address,
             "nonce": hex(nonce),
             "callData": calldata,
             "callGasLimit": "0x00",
@@ -250,11 +262,13 @@ class DataManager:
             "signature": "0x" + "ff" * 77
         }
         if entrypoint.lower() == LocalMempoolManagerV6.entrypoint_lowercase:
+            jsonDict["sender"] = self.bundler_smart_account_address_v6
             jsonDict["initCode"] = "0x"
             jsonDict["paymasterAndData"] = "0x"
             user_op = UserOperationV6(jsonDict)
             return await self.gas_manager_v6.estimate_user_operation_gas(user_op, entrypoint, dict())
         elif entrypoint.lower() == LocalMempoolManagerV7.entrypoint_lowercase:
+            jsonDict["sender"] = self.bundler_smart_account_address_v7
             jsonDict["factory"] = None
             jsonDict["factoryData"] = None
             jsonDict["paymaster"] = None

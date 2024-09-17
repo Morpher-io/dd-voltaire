@@ -3,7 +3,8 @@
 cmd="python -m voltaire_bundler \
   --rpc_url 0.0.0.0 \
   --bundler_secret $BUNDLER_SECRET \
-  --bundler_smart_wallet $BUNDLER_SMART_WALLET \
+  --bundler_smart_wallet_v6 $BUNDLER_SMART_WALLET_V6 \
+  --bundler_smart_wallet_v7 $BUNDLER_SMART_WALLET_V7 \
   --chain_id $CHAIN_ID \
   --ethereum_node_url $ETHEREUM_NODE_URL \
   --oracle $ORACLE_ADDRESS \

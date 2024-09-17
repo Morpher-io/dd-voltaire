@@ -44,7 +44,8 @@ class InitData:
     ethereum_node_url: str
     bundler_pk: str
     bundler_address: Address
-    bundler_smart_account_address: Address
+    bundler_smart_account_address_v6: Address
+    bundler_smart_account_address_v7: Address
     chain_id: int
     is_debug: bool
     is_unsafe: bool
@@ -129,9 +130,16 @@ def initialize_argument_parser() -> ArgumentParser:
     )
 
     parser.add_argument(
-        "--bundler_smart_wallet",
+        "--bundler_smart_wallet_v6",
         type=str,
-        help="Bundler smart account address",
+        help="Bundler smart account address for v6 user ops",
+        nargs="?"
+    )
+
+    parser.add_argument(
+        "--bundler_smart_wallet_v7",
+        type=str,
+        help="Bundler smart account address for v7 user ops",
         nargs="?"
     )
 
@@ -629,8 +637,12 @@ async def get_init_data(args: Namespace) -> InitData:
         sys.exit(1)
     await check_valid_entrypoints(args.ethereum_node_url, args.disable_v6)
 
-    if args.bundler_smart_wallet is None:
-        logging.error("Cannot run the data bundler without a smart account onwed by the bundler!")
+    if args.bundler_smart_wallet_v7 is None:
+        logging.error("Cannot run the data bundler without a v7 smart account onwed by the bundler!")
+        sys.exit(1)
+
+    if args.bundler_smart_wallet_v6 is None and not args.disable_v6:
+        logging.error("Cannot run the data bundler without a v6 smart account onwed by the bundler!")
         sys.exit(1)
 
     if args.oracle is None:
@@ -653,7 +665,8 @@ async def get_init_data(args: Namespace) -> InitData:
         args.ethereum_node_url,
         bundler_pk,
         bundler_address,
-        args.bundler_smart_wallet,
+        args.bundler_smart_wallet_v6,
+        args.bundler_smart_wallet_v7,
         args.chain_id,
         args.debug,
         args.unsafe,

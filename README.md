@@ -43,7 +43,7 @@ The node must allow `debug_traceCall` with custom tracers and `eth_call` with st
 
 ### Run the bundler
 ```
-poetry run python3 -m voltaire_bundler --entrypoints $ENTRYPOINT --bundler_secret $YOUR_EOA_PK --bundler_smart_wallet $YOUR_SCA_ADDRESS --chain_id $CHAIN_ID --ethereum_node_url $YOUR_RPC --oracle $ORACLE_ADDRESS --verbose
+poetry run python3 -m voltaire_bundler --entrypoints $ENTRYPOINT --bundler_secret $YOUR_EOA_PK --bundler_smart_wallet_v6 $YOUR_SCA_V6_ADDRESS --bundler_smart_wallet_v7 $YOUR_SCA_V7_ADDRESS --chain_id $CHAIN_ID --ethereum_node_url $YOUR_RPC --oracle $ORACLE_ADDRESS --verbose
 ```
 Oracle entrypoint is already deployed on Sepolia at address `0x36bDD3f53826e4359E22edb9C6DD2E81Dd4dEf41`.
 

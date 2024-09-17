@@ -56,7 +56,8 @@ class ExecutionEndpoint(Endpoint):
         data_provider_url: str,
         bundler_private_key: str,
         bundler_address: Address,
-        bundler_smart_account_address: Address,
+        bundler_smart_account_address_v6: Address,
+        bundler_smart_account_address_v7: Address,
         chain_id: int,
         is_unsafe: bool,
         is_debug: bool,
@@ -141,7 +142,8 @@ class ExecutionEndpoint(Endpoint):
             self.local_mempool_manager_v7.user_operation_handler.gas_manager,
             bundler_private_key,
             bundler_address,
-            bundler_smart_account_address,
+            bundler_smart_account_address_v6,
+            bundler_smart_account_address_v7,
             oracle_address,
             chain_id
         )
