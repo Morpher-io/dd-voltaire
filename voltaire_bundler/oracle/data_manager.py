@@ -323,14 +323,14 @@ class DataManager:
             bytes.fromhex(prefix) +
             bytes.fromhex(user_op["sender"][2:].zfill(64)) +
             bytes.fromhex(user_op["nonce"][2:].zfill(64)) +
-            keccak(bytes.fromhex(user_op["initCode"][2:])) +
+            keccak(bytes.fromhex("")) +
             keccak(bytes.fromhex(user_op["callData"][2:])) +
             bytes.fromhex(user_op["callGasLimit"][2:].zfill(64)) +
             bytes.fromhex(user_op["verificationGasLimit"][2:].zfill(64)) +
             bytes.fromhex(user_op["preVerificationGas"][2:].zfill(64)) +
             bytes.fromhex(user_op["maxFeePerGas"][2:].zfill(64)) +
             bytes.fromhex(user_op["maxPriorityFeePerGas"][2:].zfill(64)) +
-            keccak(bytes.fromhex(user_op["paymasterAndData"][2:])) +
+            keccak(bytes.fromhex("")) +
             bytes.fromhex(hex(0)[2:].zfill(64)) + # validAfter
             bytes.fromhex(hex(0)[2:].zfill(64)) + # validUntil
             bytes.fromhex(entrypoint[2:].zfill(64))
