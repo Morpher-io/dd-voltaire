@@ -138,6 +138,8 @@ class BundlerManager:
         user_operations: list[UserOperationV7] | list[UserOperationV6],
         mempool_manager: LocalMempoolManagerV7 | LocalMempoolManagerV6
     ) -> None:
+        if len(user_operations) == 0:
+            return
         entrypoint = mempool_manager.entrypoint
         nonce, block_max_fee_per_gas, block_max_priority_fee_per_gas_hex = await self._get_nonce_and_gas_prices()
         user_operations = await self.simulation_manager.discard_unpaid_data_dependent_user_operations(
