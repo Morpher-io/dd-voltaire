@@ -388,13 +388,15 @@ class DataManager:
             nonce = await self._get_nonce_for_oracle()
             valueHex = await self.provide_latest_data_value_for_key(requirement.dataKey)
             unsignedData = [
+                self.chain_id,
                 bytes.fromhex(requirement.provider[2:]),
-                bytes.fromhex(requirement.requester[2:]),
                 nonce,
+                bytes.fromhex(requirement.requester[2:]),
                 bytes.fromhex(requirement.dataKey[2:]),
                 bytes.fromhex(valueHex[2:])
             ]
-            packed = encode_packed(["address", "address", "uint256", "bytes32", "bytes32"], unsignedData)
+            packed = encode_packed(["uint256", "address", "uint256", "address", "bytes32", "bytes32"], unsignedData)
+            packed = encode_packed(["bytes", "bytes"], [bytes('\x19Oracle Signed Data Op:\n168', 'utf-8'), packed])
             (v, r, s) = self._sign_hash(keccak(packed))
             calldata = self._get_store_data_calldata(unsignedData, r.to_bytes(32, 'big'), s.to_bytes(32, 'big'), v)
             result.append(calldata)
