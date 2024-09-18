@@ -420,7 +420,7 @@ class DataManager:
         selector = '0x91dd3d25' # storeData selector
         return selector + encode(
             ["address", "address", "uint256", "bytes32", "bytes32", "bytes32", "bytes32", "uint8"],
-            data + [r, s, v]
+            [data[1], data[3], data[2]] + data[4:] + [r, s, v]
         ).hex()
 
     def _sign_hash(self, hash: bytes):
