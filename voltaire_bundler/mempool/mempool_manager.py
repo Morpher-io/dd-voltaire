@@ -22,6 +22,7 @@ from voltaire_bundler.utils.eth_client_utils import send_rpc_request_to_eth_clie
 
 from .sender_mempool import SenderMempool
 
+import traceback
 
 @dataclass
 class LocalMempoolManager():
@@ -315,6 +316,7 @@ class LocalMempoolManager():
                         self.MIN_STAKE,
                         self.MIN_UNSTAKE_DELAY
                     )
+                    logging.debug('OP VALIDATED')
                     if storage_map is not None:
                         to_bundle = True
                         for storage_address_lowercase in storage_map.keys():
@@ -356,6 +358,7 @@ class LocalMempoolManager():
                         continue
 
                 except ValidationException as err:
+                    logging.debug(traceback.format_exc())
                     if (
                         user_operation.paymaster_address_lowercase is not None and
                         "AA21" not in err.message  # not the paymaster
