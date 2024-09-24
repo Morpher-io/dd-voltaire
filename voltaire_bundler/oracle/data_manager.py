@@ -42,6 +42,7 @@ class DataManager:
     bundler_smart_account_address_v7: str
     oracle_address: str
     chain_id: int
+    cut_slot_leading_zeros: bool
 
     def __init__(
         self,
@@ -55,6 +56,7 @@ class DataManager:
         bundler_smart_account_address_v7: str,
         oracle_address: str,
         chain_id: int,
+        cut_slot_leading_zeros: bool,
     ):
         self.ethereum_node_url = ethereum_node_url
         self.data_provider_url = data_provider_url
@@ -66,6 +68,7 @@ class DataManager:
         self.bundler_smart_account_address_v7 = bundler_smart_account_address_v7
         self.oracle_address = oracle_address
         self.chain_id = chain_id
+        self.cut_slot_leading_zeros = cut_slot_leading_zeros
 
     async def provide_latest_data_value_for_key(self, data_key: str) -> str:
         value = await self._call_data_provider('/fetch?key=' + data_key)
@@ -377,7 +380,10 @@ class DataManager:
         storage_slot = "0x" + keccak(key + keccak(requester + keccak(provider + slot_position))).hex()
         value = await self.provide_latest_data_value_for_key(requirement.dataKey)
         # some clients don't like uint256 with leading 0s for some reason?
-        s_o_dict[self.oracle_address]["stateDiff"][hex(int(storage_slot, 16))] = hex(int(value, 16))
+        if self.cut_slot_leading_zeros:
+            s_o_dict[self.oracle_address]["stateDiff"][hex(int(storage_slot, 16))] = hex(int(value, 16))
+        else:
+            s_o_dict[self.oracle_address]["stateDiff"][storage_slot] = value
         return s_o_dict
 
     async def _build_meta_transactions(self, requirements: List[DataRequirement]) -> List[Any]:

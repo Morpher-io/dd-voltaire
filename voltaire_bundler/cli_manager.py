@@ -76,6 +76,7 @@ class InitData:
     logs_incremental_range: int
     logs_number_of_ranges: int
     health_check_interval: int
+    cut_slot_leading_zeros: bool
 
 
 def address(ep: str):
@@ -355,6 +356,15 @@ def initialize_argument_parser() -> ArgumentParser:
         "--disable_v6",
         type=bool,
         help="disable support for entrypoint v0.06",
+        nargs="?",
+        const=True,
+        default=False,
+    )
+
+    parser.add_argument(
+        "--cut_slot_leading_zeros",
+        type=bool,
+        help="remove leading zeros from uint256 hex encoding in state override",
         nargs="?",
         const=True,
         default=False,
@@ -697,6 +707,7 @@ async def get_init_data(args: Namespace) -> InitData:
         args.logs_incremental_range,
         args.logs_number_of_ranges,
         args.health_check_interval,
+        args.cut_slot_leading_zeros,
     )
 
     if args.verbose:

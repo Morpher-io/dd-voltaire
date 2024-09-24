@@ -76,6 +76,7 @@ class ExecutionEndpoint(Endpoint):
         logs_incremental_range: int,
         logs_number_of_ranges: int,
         oracle_address: str,
+        cut_slot_leading_zeros: bool,
     ):
         super().__init__("bundler_endpoint")
         self.ethereum_node_url = ethereum_node_url
@@ -145,7 +146,8 @@ class ExecutionEndpoint(Endpoint):
             bundler_smart_account_address_v6,
             bundler_smart_account_address_v7,
             oracle_address,
-            chain_id
+            chain_id,
+            cut_slot_leading_zeros,
         )
 
         simulation_manager = SimulationManager(

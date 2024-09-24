@@ -39,6 +39,7 @@ poetry env use python3.11
 
 ### Get a good RPC for your chain of choice or run a node yourself
 The node must allow `debug_traceCall` with custom tracers and `eth_call` with state overrides.
+Some nodes (e.g. Erigon) have problems with state overrides slots starting with 0s (i.e. "0x01...abc"). In that case, you have to launch the bundler with the flag `--cut_slot_leading_zeros` set to `true`.
 
 
 ### Run the bundler

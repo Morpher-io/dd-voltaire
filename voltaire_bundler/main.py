@@ -76,6 +76,7 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
             init_data.logs_incremental_range,
             init_data.logs_number_of_ranges,
             init_data.oracle_address,
+            init_data.cut_slot_leading_zeros,
         )
         task_group.create_task(execution_endpoint.start_execution_endpoint())
 
