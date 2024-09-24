@@ -316,7 +316,6 @@ class LocalMempoolManager():
                         self.MIN_STAKE,
                         self.MIN_UNSTAKE_DELAY
                     )
-                    logging.debug('OP VALIDATED')
                     if storage_map is not None:
                         to_bundle = True
                         for storage_address_lowercase in storage_map.keys():
