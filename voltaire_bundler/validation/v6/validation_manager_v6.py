@@ -243,8 +243,6 @@ class ValidationManagerV6(ValidationManager):
                 }
             },
         ]
-        logging.debug("TRACE CALL PARAMS:")
-        logging.debug(params)
         res: Any = await send_rpc_request_to_eth_client(
             self.ethereum_node_debug_trace_call_url, "debug_traceCall", params
         )

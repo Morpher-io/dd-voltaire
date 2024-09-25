@@ -302,6 +302,8 @@ class LocalMempoolManager():
                 latest_block_number, _, _, latest_block_timestamp, _ = (
                     await get_latest_block_info(self.ethereum_node_url)
                 )
+                # some nodes have a slight lag on blocks when performing traceCall
+                latest_block_number = hex(int(latest_block_number, 16) - 1)
 
                 try:
                     (
