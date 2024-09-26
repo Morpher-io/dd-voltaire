@@ -92,7 +92,6 @@ class ValidationManagerV7(ValidationManager):
             validation_result, debug_data = await self.simulate_validation_with_tracing(
                 user_operation, entrypoint, block_number
             )
-        logging.debug(validation_result)
         (
             return_info,
             sender_stake_info,
@@ -135,7 +134,6 @@ class ValidationManagerV7(ValidationManager):
                     paymaster_stake_info.unstakeDelaySec >= min_unstake_delay
                 )
 
-            logging.debug('pre trace result validation')
             addresses_called, storage_map = await self.tracer_manager.validate_trace_results(
                 user_operation,
                 entrypoint,
@@ -144,7 +142,6 @@ class ValidationManagerV7(ValidationManager):
                 is_paymaster_staked,
                 debug_data,
             )
-            logging.debug('trace call validated')
 
         verification_cost = return_info.pre_op_gas - user_operation.pre_verification_gas
         extra_gas = user_operation.verification_gas_limit - verification_cost
