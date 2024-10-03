@@ -12,4 +12,8 @@ cmd="python -m voltaire_bundler \
   --disable_p2p true
   --verbose"
 
+if [ "$CUT_SLOT_LEADING_ZEROS" = true ]; then
+  cmd="$cmd --cut_slot_leading_zeros true"
+fi
+
 exec $cmd
