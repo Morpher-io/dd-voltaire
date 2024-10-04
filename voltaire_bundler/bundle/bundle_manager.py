@@ -142,9 +142,9 @@ class BundlerManager:
             return
         entrypoint = mempool_manager.entrypoint
         nonce, block_max_fee_per_gas, block_max_priority_fee_per_gas_hex = await self._get_nonce_and_gas_prices()
-        user_operations = await self.simulation_manager.discard_unpaid_data_dependent_user_operations(
-            user_operations, entrypoint, self.data_manager.oracle_address, block_max_fee_per_gas
-        )
+        # user_operations = await self.simulation_manager.discard_unpaid_data_dependent_user_operations(
+        #     user_operations, entrypoint, self.data_manager.oracle_address, block_max_fee_per_gas
+        # )
         num_of_user_operations = len(user_operations)
         if num_of_user_operations == 0:
             return

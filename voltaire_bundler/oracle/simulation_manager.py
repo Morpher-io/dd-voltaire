@@ -102,7 +102,6 @@ class SimulationManager:
 
         paid_requirements = []
         user_ops_reverted = []
-        logging.info(res["result"])
         for log in res["result"]:
             byte_list = [log["address"][str(i)] for i in range(len(log["address"]))]
             hex_string = '0x' + ''.join(f'{byte:02x}' for byte in byte_list).lower()
