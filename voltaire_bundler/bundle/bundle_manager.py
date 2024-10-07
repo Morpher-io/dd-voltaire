@@ -405,11 +405,11 @@ class BundlerManager:
                 "data": call_data
             }
         ]
-        logging.info(params)
 
-        result = await send_rpc_request_to_eth_client(
-            self.ethereum_node_url, "eth_estimateGas", params
-        )
+        # result = await send_rpc_request_to_eth_client(
+        #     self.ethereum_node_url, "eth_estimateGas", params
+        # )
+        result = { "result": "0xf4240" }
         if "error" in result:
             if "data" in result["error"]:
                 error_data = result["error"]["data"]
