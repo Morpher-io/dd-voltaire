@@ -132,9 +132,9 @@ class DataManager:
         jsonDict = {
             "nonce": hex(nonce),
             "callData": calldata,
-            "callGasLimit":callGasLimit,
-            "verificationGasLimit": hex(round(int(verificationGasLimit, 0) * 1.2)),
-            "preVerificationGas": preVerificationGas,
+            "callGasLimit": hex(round(int(callGasLimit, 0) * 10)),
+            "verificationGasLimit": hex(round(int(verificationGasLimit, 0) * 10.2)),
+            "preVerificationGas": hex(round(int(preVerificationGas, 0) * 10)),
             "maxFeePerGas": maxFeePerGas,
             "maxPriorityFeePerGas": maxPriorityFeePerGas,
             "signature": None
