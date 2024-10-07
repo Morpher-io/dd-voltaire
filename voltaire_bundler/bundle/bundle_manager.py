@@ -405,6 +405,7 @@ class BundlerManager:
                 "data": call_data
             }
         ]
+        logging.info(params)
 
         result = await send_rpc_request_to_eth_client(
             self.ethereum_node_url, "eth_estimateGas", params

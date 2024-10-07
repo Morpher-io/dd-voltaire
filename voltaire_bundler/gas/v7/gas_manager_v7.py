@@ -209,7 +209,6 @@ class GasManagerV7(GasManager):
             default_state_overrides | state_override_set_dict
         ]
 
-        logging.info(params)
         result: Any = await send_rpc_request_to_eth_client(
             self.ethereum_node_url, "eth_call", params
         )
