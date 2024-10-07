@@ -363,6 +363,7 @@ class ExecutionEndpoint(Endpoint):
             state_override_set_dict,
             data_requirements
         )
+        logging.info(state_override_set_dict)
 
         return await self._event_rpc_estimateUserOperationGas([
             req_arguments[0],
