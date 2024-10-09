@@ -188,7 +188,7 @@ class DataManager:
         return self._create_exectute_safe_calldata(safeMultisendContractAddress, multi_send_calldata, 1)
 
     def _pack_meta_transactions(self, meta_transactions: List[str]) -> bytes:
-        packedMetaTxs = bytes
+        packedMetaTxs = bytes()
         for meta_tx in meta_transactions:
             abi = ["uint8", "address", "uint256", "uint256", "bytes"]
             encoded = encode_packed(abi, [
