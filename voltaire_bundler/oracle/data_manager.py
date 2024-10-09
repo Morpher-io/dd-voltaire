@@ -126,7 +126,6 @@ class DataManager:
         nonce = await self._get_bundler_nonce(entrypoint)
         meta_transactions = await self._build_meta_transactions(requirements)
         calldata = self._create_user_op_calldata(meta_transactions)
-        logging.info('CALL DATA OF MULTI TX OP: ' + calldata)
         (callGasLimit, preVerificationGas, verificationGasLimit) = await self._get_gas_limits(
             nonce, calldata, entrypoint
         )
@@ -389,10 +388,10 @@ class DataManager:
 
     async def _build_meta_transactions(self, requirements: List[DataRequirement]) -> List[Any]:
         result = []
+        nonce = await self._get_nonce_for_oracle()
         for requirement in requirements:
             if requirement.provider != self.bundler_address.lower():
                 raise Exception("Cannot inject data for another provider!")
-            nonce = await self._get_nonce_for_oracle()
             valueHex = await self.provide_latest_data_value_for_key(requirement.dataKey)
             unsignedData = [
                 self.chain_id,
@@ -402,13 +401,12 @@ class DataManager:
                 bytes.fromhex(requirement.dataKey[2:]),
                 bytes.fromhex(valueHex[2:])
             ]
-            logging.info(unsignedData)
             packed = encode_packed(["uint256", "address", "uint256", "address", "bytes32", "bytes32"], unsignedData)
             packed = encode_packed(["bytes", "bytes"], [bytes('\x19Oracle Signed Data Op:\n168', 'utf-8'), packed])
             (v, r, s) = self._sign_hash(keccak(packed))
             calldata = self._get_store_data_calldata(unsignedData, r.to_bytes(32, 'big'), s.to_bytes(32, 'big'), v)
-            logging.info(calldata)
             result.append(calldata)
+            nonce += 1
         return result
 
     async def _get_nonce_for_oracle(self) -> int:
