@@ -133,7 +133,7 @@ class DataManager:
             "nonce": hex(nonce),
             "callData": calldata,
             "callGasLimit":callGasLimit,
-            "verificationGasLimit": hex(round(int(verificationGasLimit, 0) * 1.2)),
+            "verificationGasLimit": hex(round(int(verificationGasLimit, 0) * 2)),
             "preVerificationGas": preVerificationGas,
             "maxFeePerGas": maxFeePerGas,
             "maxPriorityFeePerGas": maxPriorityFeePerGas,
