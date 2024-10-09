@@ -126,6 +126,7 @@ class DataManager:
         nonce = await self._get_bundler_nonce(entrypoint)
         meta_transactions = await self._build_meta_transactions(requirements)
         calldata = self._create_user_op_calldata(meta_transactions)
+        logging.info('CALL DATA OF MULTI TX OP: ' + calldata)
         (callGasLimit, preVerificationGas, verificationGasLimit) = await self._get_gas_limits(
             nonce, calldata, entrypoint
         )
@@ -401,10 +402,12 @@ class DataManager:
                 bytes.fromhex(requirement.dataKey[2:]),
                 bytes.fromhex(valueHex[2:])
             ]
+            logging.info(unsignedData)
             packed = encode_packed(["uint256", "address", "uint256", "address", "bytes32", "bytes32"], unsignedData)
             packed = encode_packed(["bytes", "bytes"], [bytes('\x19Oracle Signed Data Op:\n168', 'utf-8'), packed])
             (v, r, s) = self._sign_hash(keccak(packed))
             calldata = self._get_store_data_calldata(unsignedData, r.to_bytes(32, 'big'), s.to_bytes(32, 'big'), v)
+            logging.info(calldata)
             result.append(calldata)
         return result
 
