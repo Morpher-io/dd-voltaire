@@ -184,7 +184,7 @@ class DataManager:
         safeMultisendContractAddress = "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
         mutisendSelector = "0x8d80ff0a"
         multi_data = self._pack_meta_transactions(meta_transactions)
-        multi_send_calldata = mutisendSelector + encode(["bytes"], multi_data).hex()
+        multi_send_calldata = mutisendSelector + encode(["bytes"], [multi_data]).hex()
         return self._create_exectute_safe_calldata(safeMultisendContractAddress, multi_send_calldata, 1)
 
     def _pack_meta_transactions(self, meta_transactions: List[str]) -> bytes:
