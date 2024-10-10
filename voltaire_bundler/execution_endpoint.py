@@ -359,8 +359,6 @@ class ExecutionEndpoint(Endpoint):
         for req in req_arguments[2]:
             data_requirements.append(DataRequirement(req["dataKey"].lower(), req["provider"].lower(), req["requester"].lower()))
 
-        logging.info(data_requirements)
-
         state_override_set_dict = await self.data_manager.extend_state_overrides(
             state_override_set_dict,
             data_requirements

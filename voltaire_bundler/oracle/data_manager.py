@@ -373,7 +373,6 @@ class DataManager:
             requirement: DataRequirement,
             s_o_dict: dict[str, Any]
     ) -> dict[str, Any]:
-        logging.info(requirement)
         slot_position = encode(["uint256"], [ORACLE_DATA_STORAGE_SLOT])
         provider = encode(["address"], [requirement.provider])
         requester = encode(["address"], [requirement.requester])
@@ -385,7 +384,6 @@ class DataManager:
             s_o_dict[self.oracle_address]["stateDiff"][hex(int(storage_slot, 16))] = hex(int(value, 16))
         else:
             s_o_dict[self.oracle_address]["stateDiff"][storage_slot] = value
-        logging.info(s_o_dict)
         return s_o_dict
 
     async def _build_meta_transactions(self, requirements: List[DataRequirement]) -> List[Any]:
