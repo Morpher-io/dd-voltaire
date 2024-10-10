@@ -9,6 +9,7 @@ cmd="python -m voltaire_bundler \
   --ethereum_node_url $ETHEREUM_NODE_URL \
   --oracle $ORACLE_ADDRESS \
   --data_provider_url $DATA_PROVIDER_URL \
+  --logs_incremental_range 3 \
   --disable_p2p true
   --verbose"
 
