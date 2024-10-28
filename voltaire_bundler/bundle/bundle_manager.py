@@ -142,9 +142,9 @@ class BundlerManager:
             return
         entrypoint = mempool_manager.entrypoint
         nonce, block_max_fee_per_gas, block_max_priority_fee_per_gas_hex = await self._get_nonce_and_gas_prices()
-        user_operations = await self.simulation_manager.discard_unpaid_data_dependent_user_operations(
-            user_operations, entrypoint, self.data_manager.oracle_address, block_max_fee_per_gas
-        )
+        # user_operations = await self.simulation_manager.discard_unpaid_data_dependent_user_operations(
+        #     user_operations, entrypoint, self.data_manager.oracle_address, block_max_fee_per_gas
+        # )
         num_of_user_operations = len(user_operations)
         if num_of_user_operations == 0:
             return
@@ -406,9 +406,10 @@ class BundlerManager:
             }
         ]
 
-        result = await send_rpc_request_to_eth_client(
-            self.ethereum_node_url, "eth_estimateGas", params
-        )
+        # result = await send_rpc_request_to_eth_client(
+        #     self.ethereum_node_url, "eth_estimateGas", params
+        # )
+        result = { "result": "0x7a120" }
         if "error" in result:
             if "data" in result["error"]:
                 error_data = result["error"]["data"]
