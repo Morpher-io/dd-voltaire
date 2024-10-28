@@ -409,7 +409,7 @@ class BundlerManager:
         # result = await send_rpc_request_to_eth_client(
         #     self.ethereum_node_url, "eth_estimateGas", params
         # )
-        result = { "result": "0x7a120" }
+        result = { "result": "0xba120" }
         if "error" in result:
             if "data" in result["error"]:
                 error_data = result["error"]["data"]
