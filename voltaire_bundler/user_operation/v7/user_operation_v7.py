@@ -35,6 +35,7 @@ class UserOperationV7(UserOperation):
     jsonRequestDict: InitVar[dict[str, Address | int | bytes]]
 
     def __init__(self, jsonRequestDict, requirements = [], linked_op = None) -> None:
+        self.verify_fields_exist_and_fill_optional(jsonRequestDict)
         if len(jsonRequestDict) != 15:
             raise ValidationException(
                 ValidationExceptionCode.InvalidFields,
