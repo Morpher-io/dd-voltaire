@@ -18,6 +18,7 @@ class UserOperation(ABC):
     storage_map: dict[str, str | dict[str, str]] | None
     data_requirements: list
     data_dependent_user_op_hash: str | None
+    validated_at_block_hex: str | None
 
     @abstractmethod
     def get_user_operation_json(
@@ -40,22 +41,22 @@ class UserOperation(ABC):
         return self.data_dependent_user_op_hash is not None
 
 
-def verify_and_get_address(value: Address) -> Address:
+def verify_and_get_address(field_name: str, value: Address | None) -> Address:
     address_pattern = "^0x[0-9,a-f,A-F]{40}$"
     if isinstance(value, str) and re.match(address_pattern, value) is not None:
         return value
     else:
         raise ValidationException(
             ValidationExceptionCode.InvalidFields,
-            f"Invalide address value : {value}",
+            f"Invalide address value : {value} in field {field_name}",
         )
 
 
-def verify_and_get_uint(value: str) -> int:
+def verify_and_get_uint(field_name: str, value: str | None) -> int:
     if value is None:
         raise ValidationException(
             ValidationExceptionCode.InvalidFields,
-            "Invalide bytes hex value",
+            f"Invalide uint hex value in field {field_name}",
         )
 
     if value == "0x":
@@ -66,20 +67,20 @@ def verify_and_get_uint(value: str) -> int:
         except ValueError:
             raise ValidationException(
                 ValidationExceptionCode.InvalidFields,
-                f"Invalide uint hex value : {value}",
+                f"Invalide uint hex value : {value} in field {field_name}",
             )
     else:
         raise ValidationException(
             ValidationExceptionCode.InvalidFields,
-            f"Invalide uint hex value : {value}",
+            f"Invalide uint hex value : {value} in field {field_name}",
         )
 
 
-def verify_and_get_bytes(value: str) -> bytes:
+def verify_and_get_bytes(field_name: str, value: str | None) -> bytes:
     if value is None:
         raise ValidationException(
             ValidationExceptionCode.InvalidFields,
-            "Invalide bytes hex value",
+            f"Invalide bytes hex value in field {field_name}",
         )
 
     if isinstance(value, str) and value[:2] == "0x":
@@ -88,12 +89,12 @@ def verify_and_get_bytes(value: str) -> bytes:
         except ValueError:
             raise ValidationException(
                 ValidationExceptionCode.InvalidFields,
-                f"Invalide bytes hex value : {value}",
+                f"Invalide bytes hex value : {value} in field {field_name}",
             )
     else:
         raise ValidationException(
             ValidationExceptionCode.InvalidFields,
-            f"Invalide bytes hex value : {value}",
+            f"Invalide bytes hex value : {value} in field {field_name}",
         )
 
 

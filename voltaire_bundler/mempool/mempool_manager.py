@@ -113,6 +113,7 @@ class LocalMempoolManager():
 
         self.validate_multiple_roles_violation(user_operation)
 
+        user_operation.validated_at_block_hex = latest_block_number
         new_sender = None
         new_sender_address = user_operation.sender_address
 
@@ -176,6 +177,7 @@ class LocalMempoolManager():
             gas_price_hex = await self.user_operation_handler.gas_manager.verify_gas_fees_and_get_price(
                 user_operation, self.enforce_gas_price_tolerance
             )
+            user_operation.validated_at_block_hex = verified_at_block_hash
         except ValidationException:
             return "No"
 
@@ -604,7 +606,7 @@ class LocalMempoolManager():
                 entity_no_of_ops = self._get_entity_no_of_ops_in_mempool(entity)
             else:
                 entity_no_of_ops = 0
-        status = self.reputation_manager.get_status(entity)
+        status = self.reputation_manager.get_status(entity.lower())
         if status == ReputationStatus.BANNED:
             raise ValidationException(
                 ValidationExceptionCode.Reputation,
@@ -769,10 +771,11 @@ class LocalMempoolManager():
         stake: int,
         unstake_delay: int
     ):
-        if self.reputation_manager.is_whitelisted(entity):
+        entity_lowercase = entity.lower()
+        if self.reputation_manager.is_whitelisted(entity_lowercase):
             return
 
-        if self.reputation_manager.get_status(entity) == ReputationStatus.BANNED:
+        if self.reputation_manager.get_status(entity_lowercase) == ReputationStatus.BANNED:
             raise ValidationException(
                 ValidationExceptionCode.Reputation,
                 f"{entity_title} {entity} is banned."

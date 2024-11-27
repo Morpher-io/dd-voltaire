@@ -27,7 +27,7 @@ from voltaire_bundler.user_operation.v6.user_operation_handler_v6 import \
 from voltaire_bundler.user_operation.v7.user_operation_handler_v7 import \
     UserOperationHandlerV7
 from voltaire_bundler.user_operation.user_operation_handler import \
-    fell_user_operation_optional_parameters
+    fell_user_operation_optional_parameters_for_estimateUserOperationGas
 from voltaire_bundler.utils.eth_client_utils import get_latest_block_info
 
 from .bundle.bundle_manager import BundlerManager
@@ -63,6 +63,7 @@ class ExecutionEndpoint(Endpoint):
         is_debug: bool,
         is_legacy_mode: bool,
         conditional_rpc: ConditionalRpc | None,
+        flashbots_protect_node_url: str | None,
         bundle_interval: int,
         max_fee_per_gas_percentage_multiplier: int,
         max_priority_fee_per_gas_percentage_multiplier: int,
@@ -77,6 +78,8 @@ class ExecutionEndpoint(Endpoint):
         logs_number_of_ranges: int,
         oracle_address: str,
         cut_slot_leading_zeros: bool,
+        reputation_whitelist: list[str],
+        reputation_blacklist: list[str]
     ):
         super().__init__("bundler_endpoint")
         self.ethereum_node_url = ethereum_node_url
@@ -105,6 +108,8 @@ class ExecutionEndpoint(Endpoint):
             enforce_gas_price_tolerance,
             is_legacy_mode,
             ethereum_node_debug_trace_call_url,
+            reputation_whitelist,
+            reputation_blacklist
         )
 
         if disable_v6:
@@ -134,6 +139,8 @@ class ExecutionEndpoint(Endpoint):
                 enforce_gas_price_tolerance,
                 is_legacy_mode,
                 ethereum_node_debug_trace_call_url,
+                reputation_whitelist,
+                reputation_blacklist
             )
 
         self.data_manager = DataManager(
@@ -169,6 +176,7 @@ class ExecutionEndpoint(Endpoint):
             chain_id,
             is_legacy_mode,
             conditional_rpc,
+            flashbots_protect_node_url,
             max_fee_per_gas_percentage_multiplier,
             max_priority_fee_per_gas_percentage_multiplier,
         )
@@ -204,7 +212,8 @@ class ExecutionEndpoint(Endpoint):
                         await self.bundle_manager.send_next_bundle()
                 except (ValidationException, ExecutionException) as excp:
                     logging.exception(excp.message)
-
+                except:
+                    logging.error(traceback.format_exc())
                 heartbeat_counter = heartbeat_counter + 1
                 await asyncio.sleep(heartbeat_interval)
         elif not is_debug:
@@ -214,6 +223,8 @@ class ExecutionEndpoint(Endpoint):
                     await self.bundle_manager.send_next_bundle()
                 except (ValidationException, ExecutionException) as excp:
                     logging.exception(excp.message)
+                except:
+                    logging.error(traceback.format_exc())
 
                 await asyncio.sleep(bundle_interval)
 
@@ -279,10 +290,19 @@ class ExecutionEndpoint(Endpoint):
                     "Invalide state override set",
                 )
 
-        entrypoint: Address = req_arguments[1]
-        if entrypoint == LocalMempoolManagerV7.entrypoint:
+        input_entrypoint: Address = req_arguments[1]
+        if isinstance(input_entrypoint, str):
+            input_entrypoint = Address(input_entrypoint.lower())
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint",
+            )
+
+        if input_entrypoint == LocalMempoolManagerV7.entrypoint_lowercase:
+            entrypoint = LocalMempoolManagerV7.entrypoint
             user_operation_with_optional_params = (
-                fell_user_operation_optional_parameters(
+                fell_user_operation_optional_parameters_for_estimateUserOperationGas(
                     req_arguments[0]))
             user_operation = UserOperationV7(
                 user_operation_with_optional_params)
@@ -301,10 +321,11 @@ class ExecutionEndpoint(Endpoint):
                 "preVerificationGas": preverification_gas_hex,
                 "verificationGasLimit": verification_gas_hex,
             }
-        elif (entrypoint == LocalMempoolManagerV6.entrypoint and
+        elif (input_entrypoint == LocalMempoolManagerV6.entrypoint_lowercase and
               self.user_operation_handler_v6 is not None):
+            entrypoint = LocalMempoolManagerV6.entrypoint
             user_operation_with_optional_params = (
-                fell_user_operation_optional_parameters(
+                fell_user_operation_optional_parameters_for_estimateUserOperationGas(
                     req_arguments[0])
             )
             user_operation = UserOperationV6(
@@ -372,11 +393,19 @@ class ExecutionEndpoint(Endpoint):
 
     async def _event_rpc_sendUserOperation(self, req_arguments: list) -> str:
         useroperation_arg = req_arguments[0]
-        entrypoint = req_arguments[1]
-        if entrypoint == LocalMempoolManagerV7.entrypoint:
+        input_entrypoint: Address = req_arguments[1]
+        if isinstance(input_entrypoint, str):
+            input_entrypoint = Address(input_entrypoint.lower())
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint",
+            )
+
+        if input_entrypoint == LocalMempoolManagerV7.entrypoint_lowercase:
             user_operation = UserOperationV7(useroperation_arg)
             local_mempool = self.local_mempool_manager_v7
-        elif (entrypoint == LocalMempoolManagerV6.entrypoint and
+        elif (input_entrypoint == LocalMempoolManagerV6.entrypoint_lowercase and
                 self.local_mempool_manager_v6 is not None):
             user_operation = UserOperationV6(useroperation_arg)
             local_mempool = self.local_mempool_manager_v6
@@ -405,11 +434,19 @@ class ExecutionEndpoint(Endpoint):
             data_requirements.append(DataRequirement(req["dataKey"].lower(), req["provider"].lower(), req["requester"].lower()))
 
         useroperation_arg = req_arguments[0]
-        entrypoint = req_arguments[1]
-        if entrypoint == LocalMempoolManagerV7.entrypoint:
-            user_operation = UserOperationV7(useroperation_arg, requirements=data_requirements)
+        input_entrypoint: Address = req_arguments[1]
+        if isinstance(input_entrypoint, str):
+            input_entrypoint = Address(input_entrypoint.lower())
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint",
+            )
+
+        if input_entrypoint == LocalMempoolManagerV7.entrypoint_lowercase:
+            user_operation = UserOperationV7(useroperation_arg)
             local_mempool = self.local_mempool_manager_v7
-        elif (entrypoint == LocalMempoolManagerV6.entrypoint and
+        elif (input_entrypoint == LocalMempoolManagerV6.entrypoint_lowercase and
                 self.local_mempool_manager_v6 is not None):
             user_operation = UserOperationV6(useroperation_arg, requirements=data_requirements)
             local_mempool = self.local_mempool_manager_v6
@@ -521,10 +558,18 @@ class ExecutionEndpoint(Endpoint):
 
     async def _event_debug_bundler_dumpMempool(
             self, req_arguments: list) -> list[dict[str, str | None]]:
-        entrypoint = req_arguments[0]
-        if entrypoint == LocalMempoolManagerV7.entrypoint:
+        input_entrypoint: Address = req_arguments[0]
+        if isinstance(input_entrypoint, str):
+            input_entrypoint = Address(input_entrypoint.lower())
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint",
+            )
+
+        if input_entrypoint == LocalMempoolManagerV7.entrypoint_lowercase:
             local_mempool = self.local_mempool_manager_v7
-        elif (entrypoint == LocalMempoolManagerV6.entrypoint and
+        elif (input_entrypoint == LocalMempoolManagerV6.entrypoint_lowercase and
               self.local_mempool_manager_v6 is not None):
             local_mempool = self.local_mempool_manager_v6
         else:
@@ -542,11 +587,18 @@ class ExecutionEndpoint(Endpoint):
 
     async def _event_debug_bundler_setReputation(
             self, req_arguments: list) -> str:
-        entrypoint = req_arguments[1]
+        input_entrypoint: Address = req_arguments[1]
+        if isinstance(input_entrypoint, str):
+            input_entrypoint = Address(input_entrypoint.lower())
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint",
+            )
 
-        if entrypoint == LocalMempoolManagerV7.entrypoint:
+        if input_entrypoint == LocalMempoolManagerV7.entrypoint_lowercase:
             local_mempool = self.local_mempool_manager_v7
-        elif (entrypoint == LocalMempoolManagerV6.entrypoint and
+        elif (input_entrypoint == LocalMempoolManagerV6.entrypoint_lowercase and
               self.local_mempool_manager_v6 is not None):
             local_mempool = self.local_mempool_manager_v6
         else:
@@ -585,11 +637,18 @@ class ExecutionEndpoint(Endpoint):
 
     async def _event_debug_bundler_dumpReputation(
             self, req_arguments: list) -> list[dict[str, str]]:
-        entrypoint = req_arguments[0]
+        input_entrypoint: Address = req_arguments[0]
+        if isinstance(input_entrypoint, str):
+            input_entrypoint = Address(input_entrypoint.lower())
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint",
+            )
 
-        if entrypoint == LocalMempoolManagerV7.entrypoint:
+        if input_entrypoint == LocalMempoolManagerV7.entrypoint_lowercase:
             local_mempool = self.local_mempool_manager_v7
-        elif (entrypoint == LocalMempoolManagerV6.entrypoint and
+        elif (input_entrypoint == LocalMempoolManagerV6.entrypoint_lowercase and
               self.local_mempool_manager_v6 is not None):
             local_mempool = self.local_mempool_manager_v6
         else:
@@ -606,11 +665,21 @@ class ExecutionEndpoint(Endpoint):
     async def _event_debug_bundler_getStakeStatus(
             self, req_arguments: list) -> dict:
         address = req_arguments[0]
-        entrypoint = req_arguments[1]
-        if entrypoint == LocalMempoolManagerV7.entrypoint:
+        input_entrypoint: Address = req_arguments[1]
+        if isinstance(input_entrypoint, str):
+            input_entrypoint = Address(input_entrypoint.lower())
+        else:
+            raise ValidationException(
+                ValidationExceptionCode.InvalidFields,
+                "Invalid entrypoint",
+            )
+
+        if input_entrypoint == LocalMempoolManagerV7.entrypoint_lowercase:
+            entrypoint = LocalMempoolManagerV7.entrypoint
             local_mempool = self.local_mempool_manager_v7
-        elif (entrypoint == LocalMempoolManagerV6.entrypoint and
+        elif (input_entrypoint == LocalMempoolManagerV6.entrypoint_lowercase and
               self.local_mempool_manager_v6 is not None):
+            entrypoint = LocalMempoolManagerV6.entrypoint
             local_mempool = self.local_mempool_manager_v6
         else:
             raise ValidationException(
@@ -783,4 +852,14 @@ async def exception_handler_decorator(
             ),
             "is_error": True
         }
+    except:
+        logging.error(traceback.format_exc())
+        rpc_call_response = {
+            "payload": OtherJsonRpcErrorException(
+                OtherJsonRpcErrorCode.InternalError,
+                "Unexpected Error"
+            ),
+            "is_error": True
+        }
+
     return rpc_call_response

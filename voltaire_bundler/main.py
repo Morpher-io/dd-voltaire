@@ -28,7 +28,8 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
         os.remove("p2p_endpoint.ipc")
 
     # this release doesn't support p2p
-    if False and not init_data.disable_p2p:
+    init_data.disable_p2p = True
+    if not init_data.disable_p2p:
         p2p_process = p2p_boot(
             init_data.p2p_enr_tcp_port,
             init_data.p2p_enr_udp_port,
@@ -63,6 +64,7 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
             init_data.is_debug,
             init_data.is_legacy_mode,
             init_data.conditional_rpc,
+            init_data.flashbots_protect_node_url,
             init_data.bundle_interval,
             init_data.max_fee_per_gas_percentage_multiplier,
             init_data.max_priority_fee_per_gas_percentage_multiplier,
@@ -77,6 +79,8 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
             init_data.logs_number_of_ranges,
             init_data.oracle_address,
             init_data.cut_slot_leading_zeros,
+            init_data.reputation_whitelist,
+            init_data.reputation_blacklist
         )
         task_group.create_task(execution_endpoint.start_execution_endpoint())
 

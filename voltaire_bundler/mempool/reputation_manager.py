@@ -25,10 +25,23 @@ class ReputationEntry:
 
 class ReputationManager:
     entities_reputation: dict[str, ReputationEntry] = {}
-    white_list: list = []
-    black_list: list = []
+    whitelist: list[str] = []
+    blacklist: list[str] = []
 
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            reputation_whitelist: list[str],
+            reputation_blacklist: list[str]
+    ) -> None:
+        if reputation_whitelist is not None:
+            reputation_whitelist = list(map(
+                lambda entity: entity.lower(), reputation_whitelist))
+        if reputation_blacklist is not None:
+            reputation_blacklist = list(map(
+                lambda entity: entity.lower(), reputation_blacklist))
+
+        self.whitelist = reputation_whitelist
+        self.blacklist = reputation_blacklist
         asyncio.ensure_future(self.execute_reputation_cron_job())
 
     async def execute_reputation_cron_job(self) -> None:
@@ -66,20 +79,38 @@ class ReputationManager:
         self.entities_reputation[entity_address].ops_included += modifier
 
     def ban_entity(self, entity: str) -> None:
-        self.entities_reputation[entity.lower()] = ReputationEntry(10000, 0)
+        entity_lowercase = entity.lower()
+        if self.is_whitelisted(entity_lowercase):
+            logging.warning(
+                f"{entity} won't be banned because it is whitelisted.")
+        else:
+            self.entities_reputation[entity_lowercase] = ReputationEntry(10000, 0)
 
-    def is_whitelisted(self, entity: str) -> bool:
-        return entity.lower() in self.white_list
+    def is_whitelisted(self, entity_lowercase: str) -> bool:
+        if self.whitelist is not None:
+            return entity_lowercase in self.whitelist
+        else:
+            return False
 
-    def is_blacklisted(self, entity: str) -> bool:
-        return entity.lower() in self.black_list
+    def is_blacklisted(self, entity_lowercase: str) -> bool:
+        if self.blacklist is not None:
+            return entity_lowercase in self.blacklist
+        else:
+            return False
 
-    def get_status(self, entity: str) -> ReputationStatus:
-        entity_address = entity.lower()
-        if entity_address not in self.entities_reputation:
+    def get_status(self, entity_lowercase: str) -> ReputationStatus:
+        if (
+            self.is_blacklisted(entity_lowercase)
+        ):
+            return ReputationStatus.BANNED
+
+        if (
+            entity_lowercase not in self.entities_reputation or
+            self.is_whitelisted(entity_lowercase)
+        ):
             return ReputationStatus.OK
 
-        reputation_entry = self.entities_reputation[entity_address]
+        reputation_entry = self.entities_reputation[entity_lowercase]
         min_expected_included = (
             reputation_entry.ops_seen // MIN_INCLUSION_RATE_DENOMINATOR
         )
@@ -104,11 +135,11 @@ class ReputationManager:
 
     def get_entities_reputation_json(self) -> list[dict[str, str]]:
         entities_reputation_json = []
-        for entity_address in self.entities_reputation.keys():
+        for entity_address_lowercase in self.entities_reputation.keys():
             entry = entity_reputation_json = self.entities_reputation[
-                entity_address]
+                entity_address_lowercase]
 
-            status = self.get_status(entity_address)
+            status = self.get_status(entity_address_lowercase)
             if status == ReputationStatus.OK:
                 status_str = "ok"
             elif status == ReputationStatus.THROTTLED:
@@ -120,7 +151,7 @@ class ReputationManager:
                 "opsSeen": entry.ops_seen,
                 "opsIncluded": entry.ops_included,
                 "status": status_str,
-                "address": entity_address
+                "address": entity_address_lowercase
             }
             entities_reputation_json.append(entity_reputation_json)
 

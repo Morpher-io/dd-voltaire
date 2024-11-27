@@ -38,6 +38,7 @@ class BundlerManager:
     chain_id: int
     is_legacy_mode: bool
     conditional_rpc: ConditionalRpc | None
+    flashbots_protect_node_url: str | None
     max_fee_per_gas_percentage_multiplier: int
     max_priority_fee_per_gas_percentage_multiplier: int
     user_operations_to_send_v6: list[UserOperationV6] | None
@@ -56,6 +57,7 @@ class BundlerManager:
         chain_id: int,
         is_legacy_mode: bool,
         conditional_rpc: ConditionalRpc | None,
+        flashbots_protect_node_url: str | None,
         max_fee_per_gas_percentage_multiplier: int,
         max_priority_fee_per_gas_percentage_multiplier: int,
     ):
@@ -69,6 +71,7 @@ class BundlerManager:
         self.chain_id = chain_id
         self.is_legacy_mode = is_legacy_mode
         self.conditional_rpc = conditional_rpc
+        self.flashbots_protect_node_url = flashbots_protect_node_url
         self.max_fee_per_gas_percentage_multiplier = (
             max_fee_per_gas_percentage_multiplier
         )
@@ -141,10 +144,10 @@ class BundlerManager:
         if len(user_operations) == 0:
             return
         entrypoint = mempool_manager.entrypoint
-        nonce, block_max_fee_per_gas, block_max_priority_fee_per_gas_hex = await self._get_nonce_and_gas_prices()
-        logging.info(f"Gas: max fee: {block_max_fee_per_gas}, max priority fee: {block_max_priority_fee_per_gas_hex}")
+        nonce, block_max_fee_per_gas_hex, block_max_priority_fee_per_gas_hex = await self._get_nonce_and_gas_prices()
+        logging.info(f"Gas: max fee: {block_max_fee_per_gas_hex}, max priority fee: {block_max_priority_fee_per_gas_hex}")
         user_operations = await self.simulation_manager.discard_unpaid_data_dependent_user_operations(
-            user_operations, entrypoint, self.data_manager.oracle_address, block_max_fee_per_gas
+            user_operations, entrypoint, self.data_manager.oracle_address, block_max_fee_per_gas_hex
         )
         num_of_user_operations = len(user_operations)
         if num_of_user_operations == 0:
@@ -153,12 +156,12 @@ class BundlerManager:
             f"Sending bundle with {num_of_user_operations} user operations"
         )
 
-        call_data, gas_estimation, merged_storage_map = await self.create_bundle_calldata_and_estimate_gas(
+        call_data, gas_estimation_hex, merged_storage_map = await self.create_bundle_calldata_and_estimate_gas(
             user_operations,
             self.bundler_address,
             entrypoint,
         )
-        if call_data is None or gas_estimation is None:
+        if call_data is None or gas_estimation_hex is None:
             logging.error(f"Sending bundle failed. failed call data or gas estimation.") 
             return
 
@@ -167,20 +170,20 @@ class BundlerManager:
             "from": self.bundler_address,
             "to": entrypoint,
             "nonce": nonce,
-            "gas": gas_estimation,
+            "gas": gas_estimation_hex,
             "data": call_data,
         }
 
         if self.is_legacy_mode:
             txnDict.update(
                 {
-                    "gasPrice": block_max_fee_per_gas,
+                    "gasPrice": block_max_fee_per_gas_hex,
                 }
             )
         else:
             txnDict.update(
                 {
-                    "maxFeePerGas": block_max_fee_per_gas,
+                    "maxFeePerGas": block_max_fee_per_gas_hex,
                     "maxPriorityFeePerGas": block_max_priority_fee_per_gas_hex,
                 }
             )
@@ -200,6 +203,16 @@ class BundlerManager:
                     "0x" + sign_store_txn.raw_transaction.hex(),
                     {"knownAccounts": merged_storage_map}
                 ]
+            )
+        elif self.flashbots_protect_node_url is not None:
+            result = await send_rpc_request_to_eth_client(
+                self.flashbots_protect_node_url,
+                "eth_sendPrivateRawTransaction",
+                [
+                    "0x" + sign_store_txn.raw_transaction.hex(),
+                    {"fast": True}
+                ],
+                (self.bundler_address, self.bundler_private_key)
             )
         else:
             result = await send_rpc_request_to_eth_client(
@@ -352,16 +365,16 @@ class BundlerManager:
             logging.error(f"Sending bundle failed with erro: {err.message}") 
             return
 
-        block_max_fee_per_gas = tasks[0]["result"]
+        block_max_fee_per_gas_hex = tasks[0]["result"]
         nonce = tasks[1]["result"]
 
-        block_max_fee_per_gas_dec = int(block_max_fee_per_gas, 16)
+        block_max_fee_per_gas_dec = int(block_max_fee_per_gas_hex, 16)
         block_max_fee_per_gas_dec_mod = math.ceil(
             block_max_fee_per_gas_dec
             * (self.max_fee_per_gas_percentage_multiplier / 100)
             * (self.gas_price_percentage_multiplier / 100)
         )
-        block_max_fee_per_gas = hex(block_max_fee_per_gas_dec_mod)
+        block_max_fee_per_gas_hex = hex(block_max_fee_per_gas_dec_mod)
 
         block_max_priority_fee_per_gas_hex = "0x"
         if not self.is_legacy_mode:
@@ -375,7 +388,9 @@ class BundlerManager:
             )
             block_max_priority_fee_per_gas_hex = hex(
                     block_max_priority_fee_per_gas_dec_mod)
-        return (nonce, block_max_fee_per_gas, block_max_priority_fee_per_gas_hex)
+            if block_max_priority_fee_per_gas_dec_mod > block_max_fee_per_gas_dec_mod:
+                block_max_priority_fee_per_gas_hex = block_max_fee_per_gas_hex
+        return (nonce, block_max_fee_per_gas_hex, block_max_priority_fee_per_gas_hex)
 
     async def create_bundle_calldata_and_estimate_gas(
         self,
@@ -434,6 +449,41 @@ class BundlerManager:
                     return None, None, None
 
                 user_operation = user_operations[operation_index]
+
+                # check if userop was already executed if userop caused bundle
+                # gas estimation to fail
+                if user_operation.validated_at_block_hex is not None:
+                    earliest_block = user_operation.validated_at_block_hex
+                else:
+                    raise ValueError(
+                        "useroperation without validated_at_block_hex")
+
+                logs_res = await mempool_manager.user_operation_handler.get_logs(
+                    user_operation.user_operation_hash,
+                    entrypoint,
+                    earliest_block,
+                    "latest"
+                )
+
+                # if there is a UserOperationEvent for the user_operation_hash,
+                # that means userop was already executed
+                if "result" in logs_res and len(logs_res["result"]) > 0:
+                    logging.warning(
+                        "Dropping user operation that was already executed from bundle."
+                        f"useroperation: {user_operation}"
+                    )
+                    del user_operations[operation_index]
+
+                    if len(user_operations) > 0:
+                        return await self.create_bundle_calldata_and_estimate_gas(
+                            user_operations,
+                            bundler,
+                            entrypoint,
+                        )
+                    else:
+                        logging.info("No useroperations to bundle")
+                        return None, None, None
+
                 entity_to_ban = None
                 if "AA3" in reason:
                     (

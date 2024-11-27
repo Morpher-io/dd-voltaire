@@ -44,7 +44,7 @@ Some nodes (e.g. Erigon) have problems with state overrides slots starting with 
 
 ### Run the bundler
 ```
-poetry run python3 -m voltaire_bundler --entrypoints $ENTRYPOINT --bundler_secret $YOUR_EOA_PK --bundler_smart_wallet_v6 $YOUR_SCA_V6_ADDRESS --bundler_smart_wallet_v7 $YOUR_SCA_V7_ADDRESS --chain_id $CHAIN_ID --ethereum_node_url $YOUR_RPC --oracle $ORACLE_ADDRESS --verbose
+poetry run python3 -m voltaire_bundler --bundler_secret $YOUR_EOA_PK --bundler_smart_wallet_v6 $YOUR_SCA_V6_ADDRESS --bundler_smart_wallet_v7 $YOUR_SCA_V7_ADDRESS --chain_id $CHAIN_ID --ethereum_node_url $YOUR_RPC --oracle $ORACLE_ADDRESS --verbose
 ```
 Oracle entrypoint is already deployed on Sepolia at address `0x9F82E17fb4d5815cf261a9AafFE53A9834F55b9F`.
 

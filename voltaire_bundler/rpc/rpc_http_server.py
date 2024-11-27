@@ -76,8 +76,6 @@ class Error:
     error_message: str
 
 
-# TODO(mic) add new rpc to show supported data keys
-
 REQUEST_TIME_eth_chainId = Summary(
     "request_processing_seconds_eth_chainId",
     "Time spent processing request eth_chainId",

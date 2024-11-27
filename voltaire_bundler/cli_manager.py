@@ -51,6 +51,7 @@ class InitData:
     is_unsafe: bool
     is_legacy_mode: bool
     conditional_rpc: ConditionalRpc | None
+    flashbots_protect_node_url: str | None
     bundle_interval: int
     max_fee_per_gas_percentage_multiplier: int
     max_priority_fee_per_gas_percentage_multiplier: int
@@ -77,6 +78,8 @@ class InitData:
     logs_number_of_ranges: int
     health_check_interval: int
     cut_slot_leading_zeros: bool
+    reputation_whitelist: list[str]
+    reputation_blacklist: list[str]
 
 
 def address(ep: str):
@@ -274,7 +277,8 @@ def initialize_argument_parser() -> ArgumentParser:
         default=False,
     )
 
-    parser.add_argument(
+    group3 = parser.add_mutually_exclusive_group()
+    group3.add_argument(
         "--conditional_rpc",
         help="use sendRawTransactionConditional",
         nargs="?",
@@ -282,6 +286,14 @@ def initialize_argument_parser() -> ArgumentParser:
         const=ConditionalRpc.eth,
         default=None,
         choices=list(ConditionalRpc)
+    )
+
+    group3.add_argument(
+        "--flashbots_protect_node_url",
+        type=str,
+        help="Flashbots JSON-RPC Url",
+        nargs="?",
+        default=None,
     )
 
     parser.add_argument(
@@ -505,6 +517,20 @@ def initialize_argument_parser() -> ArgumentParser:
         default=600,
     )
 
+    parser.add_argument(
+        "--reputation_whitelist",
+        help="Entities that will not be banned or throttled.",
+        type=str,
+        nargs="+",
+    )
+
+    parser.add_argument(
+        "--reputation_blacklist",
+        help="Entities that are always banned.",
+        type=str,
+        nargs="+",
+    )
+
     return parser
 
 
@@ -682,6 +708,7 @@ async def get_init_data(args: Namespace) -> InitData:
         args.unsafe,
         args.legacy_mode,
         args.conditional_rpc,
+        args.flashbots_protect_node_url,
         args.bundle_interval,
         args.max_fee_per_gas_percentage_multiplier,
         args.max_priority_fee_per_gas_percentage_multiplier,
@@ -708,6 +735,8 @@ async def get_init_data(args: Namespace) -> InitData:
         args.logs_number_of_ranges,
         args.health_check_interval,
         args.cut_slot_leading_zeros,
+        args.reputation_whitelist,
+        args.reputation_blacklist
     )
 
     if args.verbose:
