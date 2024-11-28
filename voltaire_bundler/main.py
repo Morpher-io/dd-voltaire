@@ -27,15 +27,19 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
     if os.path.exists("p2p_endpoint.ipc"):
         os.remove("p2p_endpoint.ipc")
 
-    # this release doesn't support p2p
-    init_data.disable_p2p = True
     if not init_data.disable_p2p:
+        if init_data.p2p_canonical_mempool_id_06 is None:
+            init_data.p2p_canonical_mempool_id_06 = "dummy"
         p2p_process = p2p_boot(
             init_data.p2p_enr_tcp_port,
             init_data.p2p_enr_udp_port,
             init_data.p2p_target_peers_number,
             init_data.p2p_enr_address,
-            [],
+            [
+                [init_data.p2p_canonical_mempool_id_07,
+                 init_data.p2p_canonical_mempool_id_06
+                ]
+            ],
             init_data.p2p_boot_nodes_enr,
             init_data.p2p_upnp_enabled,
             init_data.p2p_metrics_enabled,
@@ -60,7 +64,7 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
             init_data.bundler_smart_account_address_v6,
             init_data.bundler_smart_account_address_v7,
             init_data.chain_id,
-            init_data.is_unsafe,
+            init_data.tracer,
             init_data.is_debug,
             init_data.is_legacy_mode,
             init_data.conditional_rpc,
@@ -80,7 +84,10 @@ async def main(cmd_args=sys.argv[1:], loop=None) -> None:
             init_data.oracle_address,
             init_data.cut_slot_leading_zeros,
             init_data.reputation_whitelist,
-            init_data.reputation_blacklist
+            init_data.reputation_blacklist,
+            init_data.native_tracer_node_url,
+            init_data.min_stake,
+            init_data.min_unstake_delay
         )
         task_group.create_task(execution_endpoint.start_execution_endpoint())
 

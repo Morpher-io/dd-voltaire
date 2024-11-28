@@ -8,7 +8,7 @@ from typing import Any, Optional
 from voltaire_bundler.bundle.exceptions import \
     DataProviderException, ExecutionException, OtherJsonRpcErrorCode, \
     OtherJsonRpcErrorException, ValidationException, ValidationExceptionCode
-from voltaire_bundler.cli_manager import ConditionalRpc
+from voltaire_bundler.cli_manager import ConditionalRpc, Tracer
 from voltaire_bundler.event_bus_manager.endpoint import Client, Endpoint
 from voltaire_bundler.oracle.data_manager import DataManager
 from voltaire_bundler.oracle.simulation_manager import SimulationManager
@@ -59,7 +59,7 @@ class ExecutionEndpoint(Endpoint):
         bundler_smart_account_address_v6: Address,
         bundler_smart_account_address_v7: Address,
         chain_id: int,
-        is_unsafe: bool,
+        tracer: Tracer,
         is_debug: bool,
         is_legacy_mode: bool,
         conditional_rpc: ConditionalRpc | None,
@@ -79,7 +79,10 @@ class ExecutionEndpoint(Endpoint):
         oracle_address: str,
         cut_slot_leading_zeros: bool,
         reputation_whitelist: list[str],
-        reputation_blacklist: list[str]
+        reputation_blacklist: list[str],
+        native_tracer_node_url: str,
+        min_stake: int,
+        min_unstake_delay: int
     ):
         super().__init__("bundler_endpoint")
         self.ethereum_node_url = ethereum_node_url
@@ -104,12 +107,15 @@ class ExecutionEndpoint(Endpoint):
             ethereum_node_url,
             bundler_address,
             chain_id,
-            is_unsafe,
+            tracer,
             enforce_gas_price_tolerance,
             is_legacy_mode,
             ethereum_node_debug_trace_call_url,
             reputation_whitelist,
-            reputation_blacklist
+            reputation_blacklist,
+            native_tracer_node_url,
+            min_stake,
+            min_unstake_delay
         )
 
         if disable_v6:
@@ -135,12 +141,15 @@ class ExecutionEndpoint(Endpoint):
                 ethereum_node_url,
                 bundler_address,
                 chain_id,
-                is_unsafe,
+                tracer,
                 enforce_gas_price_tolerance,
                 is_legacy_mode,
                 ethereum_node_debug_trace_call_url,
                 reputation_whitelist,
-                reputation_blacklist
+                reputation_blacklist,
+                native_tracer_node_url,
+                min_stake,
+                min_unstake_delay
             )
 
         self.data_manager = DataManager(
@@ -712,11 +721,12 @@ class ExecutionEndpoint(Endpoint):
         entrypoint_lowercase = verified_useroperation["entry_point_contract"]
         verified_at_block_hash = verified_useroperation["verified_at_block_hash"]
 
-        #if self.reputation_manager.get_status(peer_id) == ReputationStatus.BANNED:
-        #    logging.debug(f"Dropping gossib from banned peer : {peer_id}")
-
+        # full topic format /account_abstraction/mempool_id/Name/Encoding
+        # sepolia example
+        # /account_abstraction/Qmf7P3CuhzSbpJa8LqXPwRzfPqsvoQ6RG7aXvthYTzGxb2/user_operations/ssz_snappy
         try:
-            if topic == self.local_mempool_manager_v7.canonical_mempool_id:
+            mempool_id = topic.split('/')[2]
+            if mempool_id == self.local_mempool_manager_v7.canonical_mempool_id:
                 user_operation_obj = UserOperationV7(verified_useroperation[
                     "user_operation"])
                 local_mempool = self.local_mempool_manager_v7
@@ -729,6 +739,23 @@ class ExecutionEndpoint(Endpoint):
                 await local_mempool.add_user_operation_p2p(
                     user_operation_obj, peer_id, verified_at_block_hash
                 )
+            elif (
+                    self.local_mempool_manager_v6 is not None and
+                    mempool_id == self.local_mempool_manager_v6.canonical_mempool_id
+            ):
+                user_operation_obj = UserOperationV6(verified_useroperation[
+                    "user_operation"])
+                local_mempool = self.local_mempool_manager_v6
+                if entrypoint_lowercase != local_mempool.entrypoint_lowercase:
+                    logging.debug(
+                        "Dropping gossib from unsupported entrypoint : " +
+                        f"{entrypoint_lowercase}"
+                    )
+                    #local_mempool.reputation_manager
+                await local_mempool.add_user_operation_p2p(
+                    user_operation_obj, peer_id, verified_at_block_hash
+                )
+
             else:
                 logging.debug(f"Dropping gossib from unsupported topic : {topic}")
                 return
@@ -811,6 +838,12 @@ class ExecutionEndpoint(Endpoint):
             "block_hash": bytes.fromhex(latest_block_hash[2:]),
             "block_number": int(latest_block_number, 16),
         }
+
+    async def _event_p2p_received_status_response(
+        self, req_arguments: dict
+    ) -> None:
+        # todo
+        return
 
     async def send_pooled_user_op_hashes_request(
             self, peer_id, cursor) -> None:

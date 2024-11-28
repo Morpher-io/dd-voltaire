@@ -6,6 +6,7 @@ from eth_abi import decode, encode
 import voltaire_bundler
 from voltaire_bundler.bundle.exceptions import \
     ValidationException, ValidationExceptionCode
+from voltaire_bundler.cli_manager import Tracer
 from voltaire_bundler.user_operation.models import \
     AggregatorStakeInfo, FailedOp, ReturnInfo, StakeInfo
 from voltaire_bundler.user_operation.user_operation_handler import decode_failed_op_event
@@ -30,10 +31,11 @@ class ValidationManagerV6(ValidationManager):
     bundler_address: str
     chain_id: int
     bundler_collector_tracer: str
-    is_unsafe: bool
+    tracer: Tracer
     is_legacy_mode: bool
     enforce_gas_price_tolerance: int
     ethereum_node_debug_trace_call_url: str
+    native_tracer_node_url: str
 
     def __init__(
         self,
@@ -41,17 +43,18 @@ class ValidationManagerV6(ValidationManager):
         ethereum_node_url: str,
         bundler_address: str,
         chain_id: int,
-        is_unsafe: bool,
+        tracer: Tracer,
         is_legacy_mode: bool,
         enforce_gas_price_tolerance: int,
         ethereum_node_debug_trace_call_url: str,
+        native_tracer_node_url: str
     ):
         self.user_operation_handler = user_operation_handler
         self.tracer_manager = TracerManager(ethereum_node_url, bundler_address)
         self.ethereum_node_url = ethereum_node_url
         self.bundler_address = bundler_address
         self.chain_id = chain_id
-        self.is_unsafe = is_unsafe
+        self.tracer = tracer
         self.is_legacy_mode = is_legacy_mode
         self.enforce_gas_price_tolerance = enforce_gas_price_tolerance
         self.ethereum_node_debug_trace_call_url = ethereum_node_debug_trace_call_url
@@ -66,6 +69,7 @@ class ValidationManagerV6(ValidationManager):
 
         self.entrypoint_code_override = load_bytecode(
             "EntryPointSimulationsV7.json")
+        self.native_tracer_node_url = native_tracer_node_url
 
     async def validate_user_operation(
         self,
@@ -85,7 +89,7 @@ class ValidationManagerV6(ValidationManager):
         dict[str, str | dict[str, str]] | None
     ]:
         debug_data: Any = None
-        if self.is_unsafe:
+        if self.tracer == Tracer.unsafe:
             (
                 selector,
                 validation_result,
@@ -123,7 +127,7 @@ class ValidationManagerV6(ValidationManager):
             user_operation.to_list(), entrypoint, self.chain_id
         )
 
-        if self.is_unsafe:
+        if self.tracer == Tracer.unsafe:
             associated_addresses = None
             storage_map = None
         else:
@@ -217,6 +221,34 @@ class ValidationManagerV6(ValidationManager):
 
         return solidity_error_selector, solidity_error_params
 
+    async def get_prestate(
+        self,
+        call_data: str,
+        entrypoint: str,
+        block_number: str,
+    ):
+        params = [
+            {
+                "from": ZERO_ADDRESS,
+                "to": entrypoint,
+                "data": call_data,
+            },
+            block_number,
+            {"tracer": 'prestateTracer'}
+        ]
+        res: Any = await send_rpc_request_to_eth_client(
+            self.ethereum_node_debug_trace_call_url, "debug_traceCall", params
+        )
+        pre_state_tracer_res = res['result']
+
+        for record in pre_state_tracer_res.values():
+            if 'nonce' in record:
+                record['nonce'] = hex(record['nonce'])
+            if 'storage' in record:
+                record['state'] = record.pop('storage')
+
+        return pre_state_tracer_res
+
     async def simulate_validation_with_tracing(
         self,
         user_operation: UserOperationV6,
@@ -227,25 +259,46 @@ class ValidationManagerV6(ValidationManager):
             user_operation
         )
 
-        params = [
-            {
-                "from": ZERO_ADDRESS,
-                "to": entrypoint,
-                "data": call_data,
-            },
-            block_number,
-            {
-                "tracer": self.bundler_collector_tracer,
-                "stateOverrides": {
-                    self.bundler_address: {
-                        "balance": "0x314dc6448d9338c15b0a00000000"
+        if self.tracer == Tracer.javascript:
+            params = [
+                {
+                    "from": ZERO_ADDRESS,
+                    "to": entrypoint,
+                    "data": call_data,
+                },
+                block_number,
+                {
+                    "tracer": self.bundler_collector_tracer,
+                    "stateOverrides": {
+                        self.bundler_address: {
+                            "balance": "0x314dc6448d9338c15b0a00000000"
+                        }
                     }
+                },
+            ]
+            res: Any = await send_rpc_request_to_eth_client(
+                self.ethereum_node_debug_trace_call_url, "debug_traceCall", params
+            )
+        else:
+            state_overrides = await self.get_prestate(
+                    call_data, entrypoint, block_number)
+            state_overrides[self.bundler_address] = { "balance": "0x314dc6448d9338c15b0a00000000" }
+            params = [
+                {
+                    "from": ZERO_ADDRESS,
+                    "to": entrypoint,
+                    "data": call_data,
+                },
+                'latest',
+                {
+                    "tracer": 'bundlerCollectorTracer',
+                    "stateOverrides": state_overrides
                 }
-            },
-        ]
-        res: Any = await send_rpc_request_to_eth_client(
-            self.ethereum_node_debug_trace_call_url, "debug_traceCall", params
-        )
+            ]
+
+            res: Any = await send_rpc_request_to_eth_client(
+                self.native_tracer_node_url, "debug_traceCall", params
+            )
 
         if "result" in res and res["result"] is not None:
             debug_data = res["result"]

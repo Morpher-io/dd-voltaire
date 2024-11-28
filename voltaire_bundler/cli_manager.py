@@ -9,10 +9,11 @@ from importlib.metadata import version
 
 import aiohttp
 
+from voltaire_bundler.mempool.mempool_info import DEFAULT_MEMPOOL_INFO
 from voltaire_bundler.utils.eth_client_utils import \
     send_rpc_request_to_eth_client
 
-from .typing import Address
+from .typing import Address, MempoolId
 from .utils.import_key import (import_bundler_account,
                                public_address_from_private_key)
 
@@ -31,6 +32,16 @@ __version__ = version("voltaire_bundler")
 class ConditionalRpc(Enum):
     eth = "eth"
     fastlane = "pfl"
+    optimism = "opt"
+
+    def __str__(self):
+        return self.value
+
+
+class Tracer(Enum):
+    unsafe = "unsafe"
+    javascript = "javascript"
+    native = "native"
 
     def __str__(self):
         return self.value
@@ -48,7 +59,7 @@ class InitData:
     bundler_smart_account_address_v7: Address
     chain_id: int
     is_debug: bool
-    is_unsafe: bool
+    tracer: Tracer
     is_legacy_mode: bool
     conditional_rpc: ConditionalRpc | None
     flashbots_protect_node_url: str | None
@@ -80,6 +91,11 @@ class InitData:
     cut_slot_leading_zeros: bool
     reputation_whitelist: list[str]
     reputation_blacklist: list[str]
+    p2p_canonical_mempool_id_07: str | None
+    p2p_canonical_mempool_id_06: str | None
+    native_tracer_node_url: str
+    min_stake: int
+    min_unstake_delay: int
 
 
 def address(ep: str):
@@ -232,9 +248,7 @@ def initialize_argument_parser() -> ArgumentParser:
         default=False,
     )
 
-    group2 = parser.add_mutually_exclusive_group()
-
-    group2.add_argument(
+    parser.add_argument(
         "--ethereum_node_debug_trace_call_url",
         type=str,
         help=(
@@ -246,15 +260,14 @@ def initialize_argument_parser() -> ArgumentParser:
         default=None,
     )
 
-    group2.add_argument(
-        "--unsafe",
-        help=(
-            "UNSAFE mode: no storage or opcode checks - "
-            "when debug_traceCall is not available"
-        ),
+    parser.add_argument(
+        "--tracer",
+        help="set which tracer to use, default to javascript",
         nargs="?",
-        const=True,
-        default=False,
+        type=Tracer,
+        const=Tracer.javascript,
+        default=Tracer.javascript,
+        choices=list(Tracer)
     )
 
     parser.add_argument(
@@ -531,6 +544,47 @@ def initialize_argument_parser() -> ArgumentParser:
         nargs="+",
     )
 
+    parser.add_argument(
+        "--p2p_canonical_mempool_id_07",
+        type=str,
+        help= "Canonical mempool id for entrypoint v0.07",
+        nargs="?",
+        const=None,
+        default=None,
+    )
+
+    parser.add_argument(
+        "--p2p_canonical_mempool_id_06",
+        type=str,
+        help= "Canonical mempool id for entrypoint v0.06",
+        nargs="?",
+        const=None,
+        default=None,
+    )
+
+    parser.add_argument(
+        "--native_tracer_node_url",
+        type=str,
+        help="Eth Client JSON-RPC Url - defaults to http://0.0.0.0:8888",
+        nargs="?",
+        const="http://0.0.0.0:8888",
+        default="http://0.0.0.0:8888",
+    )
+
+    parser.add_argument(
+        "--min_stake",
+        type=unsigned_int,
+        help="minimum stake.",
+        default=1,
+    )
+
+    parser.add_argument(
+        "--min_unstake_delay",
+        type=unsigned_int,
+        help="minimum unstake delay.",
+        default=1,
+    )
+
     return parser
 
 
@@ -666,12 +720,60 @@ async def get_init_data(args: Namespace) -> InitData:
             )
             sys.exit(1)
 
-    if args.conditional_rpc is not None and args.unsafe:
-        logging.critical(
-            "sendRawTransactionalConditional can't work with unsafe mode."
-        )
-        sys.exit(1)
-    await check_valid_entrypoints(args.ethereum_node_url, args.disable_v6)
+    if args.tracer == Tracer.unsafe:
+        if args.conditional_rpc is not None:
+            logging.critical(
+                "sendRawTransactionalConditional can't work with unsafe mode."
+            )
+            sys.exit(1)
+
+        if args.javascript_tracer:
+            logging.critical(
+                "javascript_tracer can't be enabled with unsafe"
+            )
+            sys.exit(1)
+    elif args.tracer == "native":
+        try:
+            trace_call_res = await send_rpc_request_to_eth_client(
+                args.native_tracer_node_url,
+                "debug_traceCall",
+                [{}, 'latest', {"tracer": "bundlerCollectorTracer"}],
+            )
+            if "result" not in trace_call_res:
+                logging.critical(
+                    "Native tracer doesn't support bundlerCollectorTracer")
+                sys.exit(1)
+        except aiohttp.client_exceptions.ClientConnectorError:
+            logging.critical(
+                f"Connection refused for Eth node {args.native_tracer_node_url}")
+            sys.exit(1)
+        except Exception:
+            logging.critical(
+                f"Error when connecting to Eth node {args.native_tracer_node_url}")
+            sys.exit(1)
+
+    if not args.debug:
+        await check_valid_entrypoints(args.ethereum_node_url, args.disable_v6)
+
+    if not args.disable_p2p:
+        if args.p2p_canonical_mempool_id_07 is None:
+            if args.chain_id not in DEFAULT_MEMPOOL_INFO["0x0000000071727De22E5E9d8BAf0edAc6f37da032"]:
+                logging.warning(
+                    "p2p is disabled because p2p_canonical_mempool_id_07 "
+                    "not provided and no default value for the target chain."
+                )
+                args.disable_p2p = True
+            else:
+                args.p2p_canonical_mempool_id_07 = DEFAULT_MEMPOOL_INFO["0x0000000071727De22E5E9d8BAf0edAc6f37da032"][args.chain_id]
+        if not args.disable_v6 and args.p2p_canonical_mempool_id_06 is None:
+            if args.chain_id not in DEFAULT_MEMPOOL_INFO["0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"]:
+                logging.warning(
+                    "p2p is disabled because p2p_canonical_mempool_id_06 "
+                    "not provided and no default value for the target chain."
+                )
+                args.disable_p2p = True
+            else:
+                args.p2p_canonical_mempool_id_06 = DEFAULT_MEMPOOL_INFO["0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"][args.chain_id]
 
     if args.bundler_smart_wallet_v7 is None:
         logging.error("Cannot run the data bundler without a v7 smart account onwed by the bundler!")
@@ -705,7 +807,7 @@ async def get_init_data(args: Namespace) -> InitData:
         args.bundler_smart_wallet_v7,
         args.chain_id,
         args.debug,
-        args.unsafe,
+        args.tracer,
         args.legacy_mode,
         args.conditional_rpc,
         args.flashbots_protect_node_url,
@@ -736,7 +838,12 @@ async def get_init_data(args: Namespace) -> InitData:
         args.health_check_interval,
         args.cut_slot_leading_zeros,
         args.reputation_whitelist,
-        args.reputation_blacklist
+        args.reputation_blacklist,
+        args.p2p_canonical_mempool_id_07,
+        args.p2p_canonical_mempool_id_06,
+        args.native_tracer_node_url,
+        args.min_stake,
+        args.min_unstake_delay
     )
 
     if args.verbose:
